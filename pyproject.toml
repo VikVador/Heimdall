@@ -1,0 +1,68 @@
+[project]
+name = "heimdall"
+version = "0.1.0"
+description = "A latent generative model of the ocean state (GLORYS), conditioned on surface observations."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+
+# Lower bounds only, numpy, omegaconf and torch being pinned by shaggy (torch built for CUDA 13.0 on Torch, its Blackwell GPUs needing CUDA ≥ 12.8)
+dependencies = [
+  "albus @ git+https://github.com/VikVador/albus@main",
+  "azula @ git+https://github.com/probabilists/azula@dev",
+  "dask>=2024.6.2",
+  "netCDF4>=1.7.1",
+  "numpy>=2.0",
+  "omegaconf>=2.3.0",
+  "pyyaml>=6.0.2",
+  "s3fs>=2024.6.0",
+  "shaggy @ git+https://github.com/VikVador/shaggy.git",
+  "torch>=2.12.0",
+  "tqdm>=4.66.4",
+  "wandb>=0.26.1",
+  "xarray>=2025.9.0",
+  "zarr>=3.1.2",
+]
+
+[project.optional-dependencies]
+all = [
+  "cartopy>=0.24.1",
+  "cmocean>=4.0.3",
+  "ipykernel>=6.29.5",
+  "jupyterlab>=4.2.2",
+  "matplotlib>=3.9.0",
+  "pre-commit>=3.7.1",
+  "pytest>=8.2.2",
+  "ruff==0.9.9",  # Same version as the hook of pre-commit.yml
+]
+
+[tool.ruff]
+line-length = 99
+exclude = ["notebooks/"]
+
+[tool.ruff.lint]
+extend-select = ["ANN", "B", "I", "UP", "W"]
+ignore = ["ANN002", "ANN003", "ANN401", "E731", "E741"]
+preview = true
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["F401"]
+"test_*.py" = ["F403", "F405"]
+
+[tool.ruff.lint.isort]
+known-third-party = ["wandb"]
+lines-between-types = 1
+relative-imports-order = "closest-to-furthest"
+section-order = ["future", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.dynamic]
+version = {attr = "heimdall.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["heimdall*"]
