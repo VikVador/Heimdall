@@ -1,8 +1,10 @@
 # Moving to the root of the repository, whatever the current directory
 cd "$(dirname "$0")/.."
 
-# Launching the trainings of the encoders, one per modality
-sbatch cluster/jobs/encoders.sbatch
+# Launching the trainings of the encoders, GLORYS on 8 H200 and each observation dataset on 1 RTX of the lab (14 of the 16 GPUs
+# allowed per user)
+sbatch cluster/jobs/encoder-glorys.sbatch
+sbatch cluster/jobs/encoder-observations.sbatch
 
-# Checking the job once (Torch asks not to poll Slurm with watch)
+# Checking the jobs once (Torch asks not to poll Slurm with watch)
 squeue --me

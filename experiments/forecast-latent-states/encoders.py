@@ -1,7 +1,6 @@
 r"""Launch the training of the deterministic encoder of a modality, preserving the geometry of its fields."""
 
 import argparse
-import dask
 import math
 import torch
 import torch.distributed as dist
@@ -11,7 +10,7 @@ from omegaconf import OmegaConf
 from shaggy.loss import loss_geometry_embedding
 from shaggy.optimizers.gradients import safe_gradient_step
 from shaggy.optimizers.soap import SOAP
-from shaggy.tools import load, load_config, save
+from shaggy.tools import load_config, load_weights, save
 from torch import Tensor
 from torch.nn.parallel import DistributedDataParallel as DDP
 
@@ -19,7 +18,7 @@ from heimdall.config import PATH_MODELS
 from heimdall.data.dataloader import get_dataloaders
 from heimdall.data.weights import get_weights_date
 from heimdall.distributed import reduce_mean, setup_distributed
-from heimdall.model.encoders import LatentEncoder, ObservationEncoder, StateEncoder
+from heimdall.model.encoders import Encoder
 from heimdall.schedulers import warmup_cosine_decay
 from heimdall.tools import generate_run_name, get_wandb_hyperparameters, load_configuration
 
@@ -27,33 +26,29 @@ from heimdall.tools import generate_run_name, get_wandb_hyperparameters, load_co
 # fmt: off
 #
 def _build_model(
-    modality        : str,
     config_model    : dict,
     checkpoint_name : str | None,
     device          : torch.device,
-) -> tuple[LatentEncoder, dict]:
+) -> tuple[Encoder, dict]:
     r"""Build the encoder of a modality from scratch, or resume it from a checkpoint.
 
     Arguments:
-        modality        : Name of the modality, 'glorys' or an observation product.
-        config_model    : Constructor kwargs of the encoder, used when training from scratch.
+        config_model    : Constructor kwargs of the encoder (modality, lat_channels, ...), used when training from scratch.
         checkpoint_name : Name of the checkpoint to resume from (if applicable).
         device          : Target device.
 
     Returns:
         model  : Encoder in training mode, on the target device.
-        config : Constructor kwargs.
+        config : Constructor kwargs, with the domain of the encoder (checked when loading it).
     """
-
-    encoder = StateEncoder if modality == "glorys" else ObservationEncoder
 
     if checkpoint_name is not None:
         ckpt_path = PATH_MODELS / checkpoint_name
         config    = OmegaConf.to_container(load_config(ckpt_path))
-        model     = load(ckpt_path, encoder, device=str(device)).train()
+        model     = load_weights(Encoder(**config), ckpt_path, device=str(device)).train()
     else:
-        config = config_model if modality == "glorys" else {"product": modality, **config_model}
-        model  = encoder(**config).to(device)
+        model  = Encoder(**config_model).to(device)
+        config = {**config_model, "domain": model.domain}
 
     return model, config
 
@@ -69,7 +64,7 @@ def forward_loss(
     Arguments:
         model    : Encoder, possibly wrapped by DDP.
         batch    : Single day of the modality, with its observed points and date, from HeimdallDataset.
-        modality : Name of the modality, 'glorys' or an observation product.
+        modality : Name of the modality, a key of DATASET_VARIABLES.
         device   : Target device.
 
     Returns:
@@ -77,22 +72,20 @@ def forward_loss(
     """
 
     x, observed, dates = batch
-    x, observed        = x[:, 0].to(device), observed[:, 0].to(device)
+    x                  = x[:, 0].to(device)
 
-    # Conditioning | Date of each sample (the collate transposes the dates), with the observed points of the L3 products
-    glorys = modality == "glorys"
-    date   = torch.cat([get_weights_date(d, dim=2, device=device)[glorys] for d in dates[0]])
-    inputs = [x, date] if glorys else [x, observed, date]
+    # The encoder is conditioned on the date (transposed by the collate) and on the observed points of the L3 products
+    date   = torch.cat([get_weights_date(d, modality, dim=2, device=device) for d in dates[0]]).to(x.dtype)
+    inputs = [x, date] if modality == "glorys" else [x, observed[:, 0].to(device, x.dtype), date]
 
     with torch.amp.autocast(device_type=device.type, dtype=torch.bfloat16):
         z = model(torch.cat(inputs, dim=1))
 
-    # Loss | Geometry of the fields only, the conditioning being an input of the encoder
-    return loss_geometry_embedding(x, z.float())
+    # The loss only compares the geometry of the fields (distances in float32), the conditioning being an input
+    return loss_geometry_embedding(x.float(), z.float())
 
 
 def training(
-    modality        : str,
     config_state    : dict,
     config_training : dict,
     config_model    : dict,
@@ -101,21 +94,16 @@ def training(
     r"""Launch the training of the encoder of a modality.
 
     Arguments:
-        modality        : Name of the modality, 'glorys' or an observation product.
-        config_state    : Saving option and checkpoint of each encoder to resume from.
-        config_training : Batch sizes of the GLORYS and observation encoders, optimizer steps and learning rate schedule.
-        config_model    : Shared latent channels and architecture of the GLORYS and observation encoders.
+        config_state    : Saving option and checkpoint to resume from.
+        config_training : Batch sizes, optimizer steps and learning rate schedule.
+        config_model    : Modality, latent channels and architecture of the encoder.
         config_wandb    : Weights & Biases entity, project and mode.
     """
 
-    # Initialize distributed setup | RANK, LOCAL_RANK, WORLD_SIZE, MASTER_ADDR and MASTER_PORT set by the sbatch script
+    # RANK, LOCAL_RANK, WORLD_SIZE, MASTER_ADDR and MASTER_PORT are set by the sbatch script
     rank, local_rank, world_size, device, is_distributed = setup_distributed()
 
-    # Prevent xarray/dask deadlocks inside DataLoader workers
-    dask.config.set(scheduler="synchronous")
-
-    # Kind | The observation products share their batch sizes and architecture
-    kind = "glorys" if modality == "glorys" else "observations"
+    modality = config_model["modality"]
 
     (
         saving,
@@ -134,13 +122,13 @@ def training(
         warmup_steps,
     ) = (
         config_state["saving"],
-        config_state["checkpoint_names"][modality],
+        config_state["checkpoint_name"],
         config_training["steps_update"],
         config_training["steps_logging"],
         config_training["steps_validation"],
         config_training["batches_validation"],
-        config_training[f"batch_size_per_step_{kind}"],
-        config_training[f"batch_size_per_gpu_{kind}"],
+        config_training["batch_size_per_step"],
+        config_training["batch_size_per_gpu"],
         config_training["num_workers"],
         config_training["prefetch_factor"],
         config_training["learning_rate_start"],
@@ -152,11 +140,10 @@ def training(
     # Security
     assert batch_size_per_gpu > 1, f"ERROR - The GME loss pairs the samples of a GPU, batch_size_per_gpu must be > 1, got {batch_size_per_gpu}."
 
-    # Model | Loading a checkpoint or building from scratch
-    config        = {"lat_channels": config_model["lat_channels"], **config_model[f"config_{kind}"]}
-    model, config = _build_model(modality, config, checkpoint_name, device)
+    # Loading the model from a checkpoint, or building it from scratch
+    model, config = _build_model(config_model, checkpoint_name, device)
 
-    # Weights & Biases | Run named after the architecture
+    # The Weights & Biases run is named after the architecture
     run_name = generate_run_name(f"ENC_{modality}_lc{model.lat_channels}_tk{model.tokens}", checkpoint_name)
 
     if rank == 0:
@@ -185,7 +172,7 @@ def training(
         None,
     ]
 
-    # Data | Single days of the modality
+    # Each sample is a single day of the modality
     dataloader_training, dataloader_validation, _ = get_dataloaders(
         batch_size      = batch_size_per_gpu,
         num_workers     = num_workers,
@@ -200,7 +187,7 @@ def training(
         window          = 1,
     )
 
-    # Model | Masks and meshes are identical on every process, no need to broadcast them
+    # Masks and meshes are identical on every process, there is no need to broadcast them
     if is_distributed:
         ddp_kwargs = {"device_ids": [local_rank], "output_device": local_rank} if device.type == "cuda" else {}
         model      = DDP(model, broadcast_buffers=False, gradient_as_bucket_view=True, **ddp_kwargs)
@@ -321,23 +308,14 @@ if __name__ == "__main__":
         "-c",
         type=str,
         required=True,
-        help="Path to the training .yml configuration file.",
+        help="Path to the .yml configuration of the encoder, e.g. configs/encoder/encoder-sst.yml.",
     )
 
-    parser.add_argument(
-        "--modality",
-        "-m",
-        type=str,
-        required=True,
-        help="Modality of the encoder, 'glorys' or an observation product of DATASET_OBSERVATIONS.",
-    )
-
-    # Distributed | Launched by cluster/jobs/encoders.sbatch, one process per GPU started by srun
+    # Launched by cluster/jobs/encoder-*.sbatch, srun starting one process per GPU
     args   = parser.parse_args()
     config = load_configuration(args.config)[0]
 
     training(
-        modality        = args.modality,
         config_state    = config["State"],
         config_training = config["Training"],
         config_model    = config["Model"],
