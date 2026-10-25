@@ -1,5 +1,6 @@
-r"""Pytest configuration: integration mark and auto-skip when the datasets on OSN are unreachable."""
+r"""Pytest configuration: integration mark and auto-skip in CI or when the datasets on OSN are unreachable."""
 
+import os
 import pytest
 import s3fs
 
@@ -29,11 +30,13 @@ def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    r"""Auto-skip integration tests if the datasets on OSN are unreachable."""
+    r"""Auto-skip integration tests in CI (GitHub runners lack the memory) or if the datasets on OSN are unreachable."""
 
-    if not any(item.get_closest_marker("integration") for item in items) or osn_available():
+    if not any(item.get_closest_marker("integration") for item in items):
         return
-    skip_integration = pytest.mark.skip(reason="Datasets on OSN unreachable")
+    if "CI" not in os.environ and osn_available():
+        return
+    skip_integration = pytest.mark.skip(reason="CI or datasets on OSN unreachable")
     for item in items:
         if item.get_closest_marker("integration"):
             item.add_marker(skip_integration)
