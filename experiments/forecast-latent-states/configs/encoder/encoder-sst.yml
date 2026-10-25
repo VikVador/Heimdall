@@ -8,17 +8,17 @@ State:
     "checkpoint_name" : [null]
 
 Training:
-    "batch_size_per_step" : [64]
-    "batch_size_per_gpu"  : [4]
+    "batch_size_per_step" : [32]
+    "batch_size_per_gpu"  : [8]
     "batches_validation"  : [4]
-    "steps_update"        : [12800]
+    "steps_update"        : [16384]
     "steps_logging"       : [4]
     "steps_validation"    : [64]
-    "num_workers"         : [4]
+    "num_workers"         : [6]
     "prefetch_factor"     : [1]
     "warmup_steps"        : [1024]
     "learning_rate_start" : [0.00005]
-    "learning_rate_peak"  : [0.00050]
+    "learning_rate_peak"  : [0.00020]
     "learning_rate_end"   : [0.00001]
 
 Model:

@@ -201,6 +201,8 @@ GPU busy and stage the data in a CPU job beforehand. Notebooks belong on CPUs.
   don't own.
 - `#SBATCH --comment="preemption=yes;preemption_partitions_only=yes;requeue=true"` → preemptible only (may allow more
   resources).
+- B200 (192 GB) are only reachable this way, e.g. `--account=torch_pr_347_courant --constraint=b200` with the comment above
+  lands on `b200_courant_prem` (12 nodes × 8 B200, open to every account), handy for short memory tests (2026-10-25).
 - Priority: stakeholder partitions > public partitions > preemptible partitions; GPU jobs preempt CPU jobs on GPU nodes.
 - Requeued jobs restart from scratch ⇒ the training script must resume from its last checkpoint automatically.
 
