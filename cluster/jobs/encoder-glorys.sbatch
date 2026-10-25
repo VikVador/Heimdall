@@ -1,13 +1,25 @@
 #!/bin/bash
+#
+#   ~~  ~~~  ~~~   ~~  ~~~~  ~~   ~~~  ~~~   ~~  ~~~  ~~  ~~  ~~~  ~~~   ~~
+#        ~~~      .-'''-.      ~~~       .-'''-.      ~~~       .-'''-.
+#   _.-'''-._.-'''       '''-._.-'''-._.'       '''-._.-'''-._.'       '''-.
+#
+#
+#                       H   E   I   M   D   A   L   L
+#
+#
+#   ~~  ~~~  ~~~   ~~  ~~~~  ~~   ~~~  ~~~   ~~  ~~~  ~~  ~~  ~~~  ~~~   ~~
+#  ~~~~   ~~   ~~~~   ~~~   ~~   ~~~~   ~~   ~~~~   ~~~  ~~ ~~~~   ~~   ~~~~
+#
 #SBATCH --job-name=heimdall-encoder-glorys
 #SBATCH --account=torch_pr_347_courant
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
 #SBATCH --gres=gpu:8
 #SBATCH --constraint=h200
-#SBATCH --cpus-per-task=14
-#SBATCH --mem=1900G
-#SBATCH --time=47:59:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=2000G
+#SBATCH --time=48:00:00
 #SBATCH --output=cluster/logs/%x-%j.out
 
 # Environment overlay and container image

@@ -1,17 +1,29 @@
 #!/bin/bash
+#
+#   ~~  ~~~  ~~~   ~~  ~~~~  ~~   ~~~  ~~~   ~~  ~~~  ~~  ~~  ~~~  ~~~   ~~
+#        ~~~      .-'''-.      ~~~       .-'''-.      ~~~       .-'''-.
+#   _.-'''-._.-'''       '''-._.-'''-._.'       '''-._.-'''-._.'       '''-.
+#
+#
+#                       H   E   I   M   D   A   L   L
+#
+#
+#   ~~  ~~~  ~~~   ~~  ~~~~  ~~   ~~~  ~~~   ~~  ~~~  ~~  ~~  ~~~  ~~~   ~~
+#  ~~~~   ~~   ~~~~   ~~~   ~~   ~~~~   ~~   ~~~~   ~~~  ~~ ~~~~   ~~   ~~~~
+#
 #SBATCH --job-name=heimdall-encoder-observations
-#SBATCH --account=torch_pr_347_courant
+#SBATCH --account=torch_pr_347_lzanna
 #SBATCH --array=0-5
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
-#SBATCH --constraint=h200
-#SBATCH --cpus-per-task=14
-#SBATCH --mem=240G
-#SBATCH --time=47:59:00
+#SBATCH --constraint=rtx6000
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+#SBATCH --time=48:00:00
 #SBATCH --output=cluster/logs/%x-%A_%a.out
 
-# Datasets of the array, one GPU each
+# Datasets of the array, one RTX of the lab each (6 of its 8 GPUs)
 DATASETS=(sst sss-asc sss-des wind-asc wind-des chl)
 
 # Environment overlay and container image
