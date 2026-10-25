@@ -11,7 +11,7 @@ Training:
     "batch_size_per_step" : [16]
     "batch_size_per_gpu"  : [2]
     "batches_validation"  : [4]
-    "steps_update"        : [4096]
+    "steps_update"        : [8192]
     "steps_logging"       : [4]
     "steps_validation"    : [32]
     "num_workers"         : [4]
