@@ -1,0 +1,71 @@
+r"""Tests for heimdall.data.dataset."""
+
+import pytest
+import torch
+
+from heimdall.data import DATASET_PADDING, DATASET_SHAPES, DATASET_VARIABLES
+from heimdall.data.dataset import HeimdallDataset
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("modality", ["sst", "wind_asc"])
+def test_heimdall_dataset_typical(modality: str) -> None:
+    r"""Determines if a window of days has the shape of the modality, 0 where there is no value."""
+
+    dataset = HeimdallDataset("2012-08-01", "2012-08-03", modality=modality, window=2)
+    x, mask, dates = dataset[0]
+
+    assert len(dataset) == 2
+    assert dates == ["2012-08-01", "2012-08-02"]
+    assert x.shape == (2, len(DATASET_VARIABLES[modality]), *DATASET_SHAPES[modality])
+    assert mask.shape == x.shape
+    assert (x[mask == 0] == 0).all()
+    assert x.dtype == torch.bfloat16 and mask.dtype == torch.bool
+    assert x.isfinite().all() and 0 < mask.float().mean() < 1
+
+
+@pytest.mark.integration
+def test_heimdall_dataset_fill_with_nans() -> None:
+    r"""Determines if the points without value are NaN, the others keeping their physical values."""
+
+    dataset = HeimdallDataset(
+        "2012-08-01", "2012-08-01", modality="sst", standardized=False, fill_with_nans=True
+    )
+    x, mask, _ = dataset[0]
+
+    assert x[mask == 0].isnan().all()
+    assert 270 < x[mask == 1].mean() < 305  # Kelvin
+
+
+@pytest.mark.integration
+def test_heimdall_dataset_salinity_dates() -> None:
+    r"""Determines if a dataset only keeps the days of its store, the salinity starting on 2010-01-12."""
+
+    dataset = HeimdallDataset("2010-01-01", "2010-01-31", modality="sss_asc")
+
+    assert dataset.dates[0] == "2010-01-12"
+
+
+@pytest.mark.integration
+def test_heimdall_dataset_padding() -> None:
+    r"""Determines if the padded longitudes of the fields and of the masks are the ones of the other side of the globe."""
+
+    dataset = HeimdallDataset("2012-08-01", "2012-08-01", modality="sst")
+    x, mask, _ = dataset[0]
+    p, n = DATASET_PADDING["sst"], DATASET_SHAPES["sst"][-1] - 2 * DATASET_PADDING["sst"]
+
+    for field in (x, mask, dataset.mask, dataset.mesh):
+        assert torch.equal(field[..., :p], field[..., n : n + p])
+        assert torch.equal(field[..., -p:], field[..., p : 2 * p])
+
+
+@pytest.mark.integration
+def test_heimdall_dataset_mask_per_variable() -> None:
+    r"""Determines if a variable keeps its values where another variable of the modality has none (GLORYS coasts)."""
+
+    dataset = HeimdallDataset("2012-08-01", "2012-08-01", modality="glorys", standardized=False)
+    x, mask, _ = dataset[0]
+    thetao, uo = mask[0, 0].bool(), mask[0, 2].bool()
+
+    assert (thetao & ~uo).any()  # Coastal points with a temperature but no current
+    assert (x[0, 0][thetao & ~uo] != 0).any()

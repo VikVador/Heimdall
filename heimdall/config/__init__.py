@@ -3,12 +3,12 @@ r"""Global paths."""
 __all__ = [
     "PATH_SCRATCH",
     "PATH_PROJECT",
-    "PATH_DATASETS",
     "PATH_MODELS",
     "PATH_ANALYSIS",
-    "PATH_GLORYS",
-    "PATH_OBSERVATIONS",
-    "PATH_MASK",
+    "OSN_STORAGE",
+    "PATH_OSN",
+    "PATH_DATASETS",
+    "PATH_MASKS",
     "PATH_STATS",
 ]
 
@@ -20,29 +20,48 @@ from pathlib import Path
 #
 # ----- Main Folders
 #
-# Scratch of Torch ($SCRATCH, all-flash, purged when not accessed for 60 days), code and configurations living in $HOME
 PATH_SCRATCH = Path(os.environ.get("SCRATCH", "/scratch/vm3158"))
 PATH_PROJECT = PATH_SCRATCH / "heimdall"
 
 # ----- Subfolders
 #
-PATH_DATASETS = PATH_PROJECT / "datasets"
 PATH_MODELS   = PATH_PROJECT / "models"
 PATH_ANALYSIS = Path(__file__).parents[2] / "experiments" / "analysis"
 
 # ----- Datasets
 #
-# TODO | GLORYS daily states of the small subset, a zarr store of dimensions (time, depth, latitude, longitude)
-PATH_GLORYS = PATH_DATASETS / "glorys" / "glorys.zarr"
+# Anonymous connection to the public bucket
+OSN_STORAGE = {"anon": True, "client_kwargs": {"endpoint_url": "https://nyu1.osn.mghpcc.org"}}
 
-# TODO | Daily L3 products of the Copernicus Marine Data Store, regridded on GLORYS, one zarr store each (time, latitude, longitude)
-PATH_OBSERVATIONS = {
-    "sst" : PATH_DATASETS / "observations" / "sst.zarr",
-    "sla" : PATH_DATASETS / "observations" / "sla.zarr",
+# Creating paths to the datasets on the OSN storage
+PATH_OSN    = "s3://m2lines-pubs/Datasets"
+
+GLORYS      = f"{PATH_OSN}/Glorys"
+TEMPERATURE = f"{PATH_OSN}/Satellites/Temperature"
+SALINITY    = f"{PATH_OSN}/Satellites/Salinity"
+WIND        = f"{PATH_OSN}/Satellites/Wind"
+CHLOROPHYLL = f"{PATH_OSN}/Satellites/Chlorophyll"
+
+FOLDERS = {
+    "glorys"   : GLORYS,
+    "sst"      : TEMPERATURE,
+    "sss_asc"  : SALINITY,
+    "sss_des"  : SALINITY,
+    "wind_asc" : WIND,
+    "wind_des" : WIND,
+    "chl"      : CHLOROPHYLL,
 }
 
-# TODO | Land/sea mask of GLORYS (depth, latitude, longitude), 1 on sea and 0 on land
-PATH_MASK = PATH_DATASETS / "structure" / "mask.zarr"
+# Creating path to data files
+PATH_MASKS    = {modality: f"{folder}/mask.zarr" for modality, folder in FOLDERS.items()}
+PATH_STATS    = {modality: f"{folder}/statistics.zarr" for modality, folder in FOLDERS.items()}
 
-# TODO | Mean and standard deviation of every variable (statistic, [depth]), computed over the training period
-PATH_STATS = PATH_DATASETS / "statistics" / "statistics.zarr"
+PATH_DATASETS = {
+    "glorys"   : f"{GLORYS}/cmems_glorys_2000-2025_daily_4320x2041x50.zarr",
+    "sst"      : f"{TEMPERATURE}/cmems_temperature_2000-2025_daily_3600x1600.zarr",
+    "sss_asc"  : f"{SALINITY}/cmems_salinity-asc_2010-2025_daily_1800x837.zarr",
+    "sss_des"  : f"{SALINITY}/cmems_salinity-des_2010-2025_daily_1800x837.zarr",
+    "wind_asc" : f"{WIND}/cmems_wind-asc_2000-2025_daily_1440x720.zarr",
+    "wind_des" : f"{WIND}/cmems_wind-des_2000-2025_daily_1440x720.zarr",
+    "chl"      : f"{CHLOROPHYLL}/cmems_chlorophyll_2000-2025_daily_8640x4320.zarr",
+}

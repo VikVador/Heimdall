@@ -104,6 +104,7 @@ def get_dataloaders(
             sampler = None
             dataloader_shuffle = shuffle[i]
 
+        # Workers are spawned, since the connections to OSN (s3fs) hang in forked processes
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
@@ -114,6 +115,7 @@ def get_dataloaders(
             pin_memory=True,
             persistent_workers=num_workers > 0,
             drop_last=True,
+            multiprocessing_context="spawn" if num_workers > 0 else None,
         )
         dataloaders.append(dataloader)
 

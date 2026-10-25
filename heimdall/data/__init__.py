@@ -2,64 +2,88 @@ r"""Information about our datasets, the GLORYS states and the surface observatio
 
 __all__ = [
     "VARIABLES_CLIPPING",
+    "VARIABLES_STANDARDIZATION",
     "DATASET_DATES_TRAINING",
     "DATASET_DATES_VALIDATION",
     "DATASET_DATES_TEST",
+    "DATASET_VARIABLES",
     "DATASET_REGION",
-    "DATASET_VARIABLES_GLORYS",
-    "DATASET_OBSERVATIONS",
+    "DATASET_PADDING",
+    "DATASET_SHAPES",
     "MODALITIES",
-    "Z",
-    "X",
-    "Y",
 ]
 
 # fmt: off
 #
 # ----- Preprocessing
 #
-# TODO | Physical bounds of the variables, (lower, upper) with None when unbounded
 VARIABLES_CLIPPING = {
-    "so" : (0, None),
+    "so"                   : (0, None),
+    "Sea_Surface_Salinity" : (0, None),
+    "CHL"                  : (0, None),
+}
+
+VARIABLES_STANDARDIZATION = {
+    "thetao"                  : "daily",
+    "so"                      : "daily",
+    "uo"                      : "daily",
+    "vo"                      : "daily",
+    "sea_surface_temperature" : "daily",
+    "Sea_Surface_Salinity"    : "daily",
+    "eastward_wind"           : "daily",
+    "northward_wind"          : "daily",
+    "CHL"                     : "daily",
+    "default"                 : "daily",
 }
 
 # ----- Splits
 #
-# TODO | Dates of the small subset available on Torch
-DATASET_DATES_TRAINING   = ("1993-01-01", "2016-12-31")
-DATASET_DATES_VALIDATION = ("2017-01-01", "2019-12-31")
-DATASET_DATES_TEST       = ("2020-01-01", "2021-12-31")
-
-# ----- Domain
-#
-# TODO | Crop of the GLORYS grid, every modality being regridded on it
-DATASET_REGION = {
-    "x": slice(0, 512),
-    "y": slice(0, 256),
-    "z": slice(0, 32),
-}
+DATASET_DATES_TRAINING   = ("2000-01-01", "2018-12-31")
+DATASET_DATES_VALIDATION = ("2019-01-01", "2021-12-31")
+DATASET_DATES_TEST       = ("2022-01-01", "2025-12-31")
 
 # ----- Variables
 #
-# TODO | GLORYS states x_t, 3D variables only for the first prototype (zos, 2D, to add later)
-DATASET_VARIABLES_GLORYS = [
-    "thetao",
-    "so",
-    "uo",
-    "vo",
-]
-
-# TODO | Surface observations y_t, the variables of each L3 product, each product having its own encoder
-DATASET_OBSERVATIONS = {
-    "sst" : ["sea_surface_temperature"],
-    "sla" : ["sla"],
+DATASET_VARIABLES = {
+    "glorys"   : ["thetao", "so", "uo", "vo"],
+    "sst"      : ["sea_surface_temperature"],
+    "sss_asc"  : ["Sea_Surface_Salinity"],
+    "sss_des"  : ["Sea_Surface_Salinity"],
+    "wind_asc" : ["eastward_wind", "northward_wind"],
+    "wind_des" : ["eastward_wind", "northward_wind"],
+    "chl"      : ["CHL"],
 }
 
-# Modalities | Each with its own encoder and latent
-MODALITIES = ["glorys", *DATASET_OBSERVATIONS]
+MODALITIES = list(DATASET_VARIABLES)
 
-# ----- Dimensions
+# ----- Domain
 #
-X = DATASET_REGION["x"].stop - DATASET_REGION["x"].start  # Longitudes
-Y = DATASET_REGION["y"].stop - DATASET_REGION["y"].start  # Latitudes
-Z = DATASET_REGION["z"].stop - DATASET_REGION["z"].start  # Depth levels
+DATASET_REGION = {
+    "glorys"   : {"x": slice(0, 4320), "y": slice(25, 2041), "z": slice(0, 48)},
+    "sst"      : {"x": slice(0, 3600), "y": slice(0,  1600)},
+    "sss_asc"  : {"x": slice(0, 1800), "y": slice(5,   837)},
+    "sss_des"  : {"x": slice(0, 1800), "y": slice(5,   837)},
+    "wind_asc" : {"x": slice(0, 1440), "y": slice(46,  718)},
+    "wind_des" : {"x": slice(0, 1440), "y": slice(46,  718)},
+    "chl"      : {"x": slice(0, 8640), "y": slice(32, 4320)},
+}
+
+# Longitudes added on each side of the region, taken from the other side of the globe (periodic)
+DATASET_PADDING = {
+    "glorys"   : 0,
+    "sst"      : 8,
+    "sss_asc"  : 4,
+    "sss_des"  : 4,
+    "wind_asc" : 0,
+    "wind_des" : 0,
+    "chl"      : 0,
+}
+
+DATASET_SHAPES = {
+    modality: tuple(
+        region[axis].stop - region[axis].start + (2 * DATASET_PADDING[modality] if axis == "x" else 0)
+        for axis in ("z", "y", "x")
+        if axis in region
+    )
+    for modality, region in DATASET_REGION.items()
+}

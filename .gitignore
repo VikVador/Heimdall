@@ -10,7 +10,6 @@ cluster/logs/*
 experiments/*/wandb/
 experiments/analysis/*
 !experiments/analysis/.gitkeep
-notebooks/*.ipynb
 wandb/
 
 # Byte-compiled / optimized / DLL files

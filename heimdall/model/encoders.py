@@ -1,112 +1,94 @@
 r"""Deterministic encoders of the GLORYS states and of the surface observations into latent grids."""
 
 __all__ = [
-    "LatentEncoder",
-    "StateEncoder",
-    "ObservationEncoder",
+    "Encoder",
 ]
 
 import math
 import torch
 import torch.nn as nn
 
-from collections.abc import Sequence
 from shaggy.models.cae import ConvEncoder
 from torch import Tensor
 from typing import Any
 
-from heimdall.data import DATASET_OBSERVATIONS, DATASET_VARIABLES_GLORYS, X, Y, Z
+from heimdall.data import DATASET_PADDING, DATASET_REGION, DATASET_SHAPES, DATASET_VARIABLES
 from heimdall.data.weights import get_weights_mask, get_weights_mesh
 
 
-class LatentEncoder(nn.Module):
-    r"""Creates a deterministic encoder of fields and their conditioning, stacked with static inputs, into a latent grid.
+def get_domain(modality: str) -> dict[str, list[int] | int]:
+    r"""Return the domain of a modality, its region and padding as plain values (saved with the encoder).
 
     Arguments:
-        static       : Land/sea mask and sin/cos mesh (1 + C_m, L_1, ..., L_S).
-        in_channels  : Number of channels of the fields and their conditioning C_i.
-        resolution   : Spatial shape of the fields (L_1, ..., L_S).
+        modality : Name of the modality, a key of DATASET_VARIABLES.
+
+    Returns:
+        domain : Indices [start, stop] of each axis of DATASET_REGION, and the padding of DATASET_PADDING.
+    """
+
+    region = {axis: [s.start, s.stop] for axis, s in DATASET_REGION[modality].items()}
+    return {**region, "padding": DATASET_PADDING[modality]}
+
+
+class Encoder(nn.Module):
+    r"""Creates the deterministic encoder of a modality, its fields and conditioning stacked with static inputs.
+
+    Arguments:
+        modality     : Name of the modality, a key of DATASET_VARIABLES.
         lat_channels : Number of latent channels C_z.
-        config       : Keyword arguments of the ConvEncoder (hid_channels, ...).
+        domain       : Domain the encoder was trained on (from its saved configuration), None for a new encoder.
+        config       : Keyword arguments of the ConvEncoder (hid_channels, stride, ...).
     """
 
     def __init__(
         self,
-        static: Tensor,
-        in_channels: int,
-        resolution: Sequence[int],
+        modality: str,
         lat_channels: int,
+        domain: dict[str, Any] | None = None,
         **config: Any,
     ) -> None:
         super().__init__()
 
-        self.lat_channels = lat_channels
+        # The static inputs are rebuilt from DATASET_REGION and DATASET_PADDING, so the domain must not have changed
+        valid = domain is None or dict(domain) == get_domain(modality)
+        assert valid, (
+            f"ERROR - Encoder trained on {domain}, the domain of {modality} is now {get_domain(modality)}."
+        )
 
-        # Static inputs | Rebuilt at loading (not saved)
+        self.modality = modality
+        self.lat_channels = lat_channels
+        self.domain = get_domain(modality)
+
+        # The land/sea mask and the sin/cos mesh are rebuilt at loading (not saved), in bfloat16 like the fields
+        static = torch.cat([get_weights_mask(modality), get_weights_mesh(modality)]).bfloat16()
         self.register_buffer("static", static, persistent=False)
 
-        # Deterministic | No modulation of the normalization layers
+        # The inputs are the fields and the date, plus the observed points of each variable for the observations
+        variables = len(DATASET_VARIABLES[modality])
+        in_channels = (variables if modality == "glorys" else 2 * variables) + 2
+
+        # The encoder is deterministic, without modulation of the normalization layers
+        shape = DATASET_SHAPES[modality]
         self.encoder = ConvEncoder(
             in_channels + len(static),
             lat_channels,
-            spatial=len(resolution),
+            spatial=len(shape),
             mod_features=None,
             **config,
         )
 
-        # Latent grid | Each spatial dimension divided by the scale of the encoder
-        self.shape = [n // s for n, s in zip(resolution, self.encoder.scale, strict=True)]
+        # Each spatial dimension of the latent grid is divided by the scale of the encoder
+        self.shape = [n // s for n, s in zip(shape, self.encoder.scale, strict=True)]
         self.tokens = math.prod(self.shape)
 
     def forward(self, x: Tensor) -> Tensor:
         r"""Encode fields and their conditioning into latent grids.
 
         Arguments:
-            x : Fields and their conditioning (B, C_i, L_1, ..., L_S).
+            x : Fields and their conditioning (B, C_i, [Z,] Y, X).
 
         Returns:
-            z : Latent grids (B, C_z, L_1', ..., L_S').
+            z : Latent grids (B, C_z, [Z',] Y', X').
         """
+
         return self.encoder(torch.cat([x, self.static.expand(len(x), *self.static.shape)], dim=1))
-
-
-class StateEncoder(LatentEncoder):
-    r"""Creates the deterministic encoder of the GLORYS states, conditioned on the date.
-
-    Arguments:
-        lat_channels : Number of latent channels C_z.
-        config       : Keyword arguments of the ConvEncoder (hid_channels, ...).
-    """
-
-    def __init__(
-        self,
-        lat_channels: int,
-        **config: Any,
-    ) -> None:
-        (_, mask), (_, mesh) = get_weights_mask(), get_weights_mesh()
-        channels = len(DATASET_VARIABLES_GLORYS) + 2
-
-        super().__init__(torch.cat([mask, mesh]), channels, (Z, Y, X), lat_channels, **config)
-
-
-class ObservationEncoder(LatentEncoder):
-    r"""Creates the deterministic encoder of an observation product, with its observed points, conditioned on the date.
-
-    Arguments:
-        product      : Name of the observation product, a key of DATASET_OBSERVATIONS.
-        lat_channels : Number of latent channels C_z.
-        config       : Keyword arguments of the ConvEncoder (hid_channels, ...).
-    """
-
-    def __init__(
-        self,
-        product: str,
-        lat_channels: int,
-        **config: Any,
-    ) -> None:
-        (mask, _), (mesh, _) = get_weights_mask(), get_weights_mesh()
-        channels = 2 * len(DATASET_OBSERVATIONS[product]) + 2
-
-        super().__init__(torch.cat([mask, mesh]), channels, (Y, X), lat_channels, **config)
-
-        self.product = product

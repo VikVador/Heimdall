@@ -13,7 +13,8 @@
 
 # NYU TORCH HPC
 Distilled from the [NYU RTS docs](https://services.rt.nyu.edu/docs/hpc/getting_started/intro/) (source repo
-[NYU-RTS/rts-docs](https://github.com/NYU-RTS/rts-docs)) and checked on the cluster on 2026-10-14.
+[NYU-RTS/rts-docs](https://github.com/NYU-RTS/rts-docs)), checked on the cluster on 2026-10-14 and updated with what
+we learned while building the datasets (2026-10-22).
 Items marked **[verify]** are not in the docs or are ambiguous: check them before relying on them.
 
 **Contents**
@@ -45,8 +46,10 @@ Items marked **[verify]** are not in the docs or are ambiguous: check them befor
                       run *on* Torch.
 - **VSCode**        : recommended `code-server` app in Open OnDemand (https://ood.torch.hpc.nyu.edu). Remote-SSH works
                       with `Remote.SSH: Connect Timeout = 120`, "Lockfiles In Tmp" on, "Use Flock" off, and
-                      `~/.vscode-server` symlinked to `$SCRATCH/.vscode-server` (home inode quota).
-- **Cluster usage** : https://stats.apps.cloud.rt.nyu.edu (VPN), or `vsinfo` (root of the repository).
+                      `~/.vscode-server` symlinked to `$SCRATCH/.vscode-server` (home inode quota). A reconnection
+                      can land on another login node (`torch-login-a-0`, `a-1`, `b-1`, `b-3`, …): processes started
+                      from the previous one keep running there (`ssh torch-login-b-3` from Torch to stop them).
+- **Cluster usage** : https://stats.apps.cloud.rt.nyu.edu (VPN), or `vsinfo` (in `~/bin`).
 - **Support**       : hpc@nyu.edu (personal consultations available, including DL scaling).
 
 `~/.ssh/config` (from the docs):
@@ -144,6 +147,8 @@ All verified with held jobs.
   partition the account reaches that matches the request. Pick the GPU type with `--constraint` (`rtx6000`, `h200`,
   `'h200|l40s'`). Features (`sinfo -o "%P %f"`): `rtx6000`, `l40s`, `h200`, `h100`, `a100`, `b200`, plus `cuda`.
 - **`--mem=0` is refused** ("Please do not request memory 0"): request it explicitly, e.g. `--mem=1400G` per RTX node.
+- **`--exclude=<node>` is refused** ("Please do note --exclude … report back to hpc@nyu.edu"): report a faulty node to
+  hpc@nyu.edu instead.
 
 ### Limits per user
 
@@ -159,9 +164,17 @@ All verified with held jobs.
 | **`gpu48`**   | **2 d**   | **16 GPUs**           | GPU jobs ≤ 48 h                 |
 | **`gpu168`**  | **7 d**   | **4 GPUs**            | GPU jobs > 48 h (sbatch notice) |
 
+- The GPU caps are **per user, over all their running jobs** (`MaxTRESPerUser`, no per-job cap): one job can take the
+  16 GPUs, or 2 jobs 8 each, the next ones waiting (`QOSMaxGRESPerUser`). At most 500 (`gpu48`) or 50 (`gpu168`) jobs
+  per user in the queue (`sacctmgr show qos gpu48`, 2026-10-22).
 - The docs also mention "24 GPUs per user for jobs < 48 h" (`QOSMaxGRESPerUser`), but `show_slurm_qos` gives
   `gres/gpu=16` for `gpu48` (2026-10-14).
 - ⇒ Multi-node training: jobs ≤ 48 h, chained with checkpoint/restart.
+- **At most 3000 jobs per user in the queue** (`MaxSubmitJobsPerUser` of `cpu48`), **each task of an array counting**
+  (`QOSMaxSubmitJobPerUserLimit`) ⇒ submit big arrays in rolling batches (e.g. the next batch submitted by the last
+  job of the current one).
+- When the cluster is busy, Slurm starts the tasks of an array in slow batches (~15 min apart): a throttled array
+  showing `JobArrayTaskLimit` with no task running is slow, not stuck.
 
 ### Cancellation of underused GPUs
 
@@ -249,7 +262,7 @@ GPU busy and stage the data in a CPU job beforehand. Notebooks belong on CPUs.
 
 - **Never transfer on login nodes**: use the DTN `dtn.torch.hpc.nyu.edu` (rsync, scp, rclone) or **Globus** (endpoint
   **`nyu#torch`**, recommended for large volumes, automatic retries).
-- `rclone` is available on the DTN and as a module (`module load rclone/1.68.2`).
+- `rclone` is available on the DTN and as a module (`module load rclone/1.72.1`, the only version on 2026-10-22).
 - Open OnDemand upload: small files only.
 
 ---
@@ -257,15 +270,19 @@ GPU busy and stage the data in a CPU job beforehand. Notebooks belong on CPUs.
 ## 8. OSN POD (Open Storage Network, S3-compatible object storage)
 
 - **Endpoint**   : **`https://nyu1.osn.mghpcc.org`** (M²LInES pod).
-- **Buckets**    : public **`m2lines-pubs`** (e.g. `m2lines-pubs/Samudra/OM4`, Zarr). Others exist, e.g. `emulators`
-                   (seen in a Samudra PR) **[ask the group for names and keys]**.
+- **Buckets**    : **`m2lines-pubs`**, public: anonymous listing and reads work since 2026-10-22 (refused before).
+                   Others exist, e.g. `emulators` (seen in a Samudra PR).
+- **Heimdall**   : datasets 2000-2025 in **`m2lines-pubs/Datasets`** (~12.4 TB, `README.md` at its root), paths in
+                   `heimdall/config`, read anonymously by the code (no keys). Writing only with the rclone remote
+                   **`osn-rw`** (`module load rclone/1.72.1`) or the s3fs profile **`osn`**, set up privately by each
+                   user. Keys are never written in the repository nor displayed.
 - **Access**     : *open* buckets = anonymous read, keys to write; *protected* buckets = keys to read and write, with
                    **two pairs, RO and RW** → use RO in training jobs.
 - **Naming**     : lowercase, digits, `-_.`; no names differing only by case.
 - **Keys, help** : https://coldfront.osn.mghpcc.org (keys), https://openstoragenetwork.github.io/docs/,
                    help@osn.mghpcc.org.
 
-rclone (`~/.config/rclone/rclone.conf`), then `rclone ls osn:/m2lines-pubs` or
+rclone remote (set up privately), then `rclone ls osn:/m2lines-pubs` or
 `rclone copy --transfers=32 osn:/bucket/path $SCRATCH/path` (on the DTN):
 
 ```
@@ -281,9 +298,17 @@ no_check_bucket = true
 Python / xarray (public bucket):
 
 ```python
-ds = xr.open_zarr("s3://m2lines-pubs/Samudra/OM4",
+ds = xr.open_zarr("s3://m2lines-pubs/Datasets/Glorys/cmems_glorys_2000-2025_daily_4320x2041x50.zarr",
                   storage_options={"anon": True, "client_kwargs": {"endpoint_url": "https://nyu1.osn.mghpcc.org"}})
 ```
+
+- **PyTorch DataLoader**: workers reading OSN through s3fs must be spawned (`multiprocessing_context="spawn"`), forked
+  ones hang.
+- **Throughput**: ~30 MB/s per S3 stream ⇒ parallelism comes from the dataloader workers, not the batch size; sharded
+  zarr (one object per day) was ~2× faster to read than one object per chunk.
+- **rclone**: `rclone about` is not supported by the pod, and `rclone purge` prints a harmless "Failed to read
+  versioning status" error. Listings (`rclone lsf`, `rclone size --fast-list`) are fine; big copies go on the DTN or
+  in a job.
 
 ---
 
@@ -302,6 +327,10 @@ ds = xr.open_zarr("s3://m2lines-pubs/Samudra/OM4",
   nodes (`srun --account=<acct> -c4 --mem=16GB -t2:00:00 --pty bash`).
 - **Jobs mount the overlay `:ro`**: a `:rw` mount locks the file, many jobs can share a `:ro` mount.
   Add `--nv` for GPUs.
+- **Jupyter**: `sbatch cluster/jobs/jupyter.sbatch` (CPU node, add `--mem=96G` for a full day of GLORYS), then in
+  VSCode *Select Kernel → Existing Jupyter Server* with `http://<node>:8888/lab?token=…` (node from `squeue`, token in
+  `cluster/logs/jupyter.log`).
+- `/tmp` is local to each node: files written there on a login node are not visible from the compute nodes.
 - Remove any `conda init` block from `~/.bashrc` (it breaks overlay environments). Use `export PYTHONNOUSERSITE=True`.
 - Images: `ls /share/apps/images/`. Overlay sizes: `ls /share/apps/overlay-fs-ext3/`.
 - Optional: convert ext3 → squashfs (`mksquashfs /ext3 env.sqf -keep-as-directory`), ~2.5× smaller.
@@ -375,12 +404,12 @@ Job arrays share `SLURM_JOBID` ⇒ add `$SLURM_ARRAY_TASK_ID` to `MASTER_PORT`.
 
 ## 12. OPEN QUESTIONS
 
-| #   | Question                                                            | Status                        |
-| --- | ------------------------------------------------------------------- | ----------------------------- |
-| 1   | OSN buckets and RO/RW keys of the project? RPS volume of the group? | **open**                      |
-| 2   | Delay before an underused GPU job is cancelled?                     | **open**, ask hpc@nyu.edu     |
-| 3   | `courant` allocation ends on **2026-12-10**                         | **to do**, PI to renew it     |
-| 4   | lzanna's GPUs and group cap                                         | 8 RTX for the whole lab (§ 3) |
-| 5   | `--constraint` names, node prefix ↔ GPU type                        | see § 2 and § 4               |
-| 6   | Internet on compute nodes (OSN, WandB, PyPI, GitHub)?               | yes, despite the docs (§ 6)   |
-| 7   | Per-user GPU cap                                                    | ≤ 48 h → 16, > 48 h → 4 (§ 4) |
+| #   | Question                                              | Status                                     |
+| --- | ----------------------------------------------------- | ------------------------------------------ |
+| 1   | OSN bucket of the project? RPS volume of the group?   | `m2lines-pubs`, public (§ 8); RPS **open** |
+| 2   | Delay before an underused GPU job is cancelled?       | **open**, ask hpc@nyu.edu                  |
+| 3   | `courant` allocation ends on **2026-12-10**           | **to do**, PI to renew it                  |
+| 4   | lzanna's GPUs and group cap                           | 8 RTX for the whole lab (§ 3)              |
+| 5   | `--constraint` names, node prefix ↔ GPU type          | see § 2 and § 4                            |
+| 6   | Internet on compute nodes (OSN, WandB, PyPI, GitHub)? | yes, despite the docs (§ 6)                |
+| 7   | Per-user GPU cap                                      | ≤ 48 h → 16, > 48 h → 4 (§ 4)              |
