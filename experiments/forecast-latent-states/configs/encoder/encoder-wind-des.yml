@@ -9,7 +9,7 @@ State:
 
 Training:
     "batch_size_per_step" : [32]
-    "batch_size_per_gpu"  : [32]
+    "batch_size_per_gpu"  : [16]
     "batches_validation"  : [4]
     "steps_update"        : [25600]
     "steps_logging"       : [4]
