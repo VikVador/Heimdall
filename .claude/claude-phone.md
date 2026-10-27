@@ -23,6 +23,7 @@ Remote Control of Claude Code.
 3. How long it stays open
 4. Requirements
 5. Phone answer mode
+6. Install on a new machine
 
 ---
 
@@ -165,3 +166,25 @@ en 2019-2021. Je les ai retirées et l'entraînement repart de zéro (≈ 20 h).
 | `~/.claude/hooks/phone-mode.sh`   | turns the mode on / off (state file `~/.claude/phone/mode`)         |
 | `~/.claude/commands/phone.md`     | the `/phone` command                                                |
 | `~/.claude/settings.json`         | declares the two hooks                                              |
+
+---
+
+## 6. INSTALL ON A NEW MACHINE
+
+The scripts live in `.claude/phone/` of the repository; copy them to the places Claude Code and the shell expect.
+
+| From `.claude/phone/`                                | To                                                         |
+| ---------------------------------------------------- | ---------------------------------------------------------- |
+| `claude-phone`                                       | `~/bin/claude-phone` (in `PATH`)                           |
+| `phone-mode.sh`, `phone-prompt.sh`, `phone-start.sh` | `~/.claude/hooks/`                                         |
+| `phone.md`                                           | `~/.claude/commands/phone.md`                              |
+| `settings-hooks.json`                                | merged into `~/.claude/settings.json` (keep what is there) |
+
+```bash
+mkdir -p ~/bin ~/.claude/hooks ~/.claude/commands
+cp .claude/phone/claude-phone ~/bin/ && cp .claude/phone/phone-*.sh ~/.claude/hooks/
+cp .claude/phone/phone.md ~/.claude/commands/ && chmod +x ~/bin/claude-phone ~/.claude/hooks/phone-*.sh
+```
+
+- Set `CLAUDE_PHONE_DIR` (or edit the default `~/heimdall` in the script) to the repository of the project.
+- After a change of a script, copy it back into `.claude/phone/` so that both stay identical.
