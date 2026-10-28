@@ -22,7 +22,7 @@ from heimdall.data import (
     MODALITIES,
     VARIABLES_CLIPPING,
 )
-from heimdall.data.tools import assert_date_format, crop, decode, open_zarr
+from heimdall.data.tools import assert_date_format, coarsen, crop, decode, open_zarr
 from heimdall.data.weights import get_weights_mask, get_weights_mesh, get_weights_stats
 
 
@@ -36,6 +36,7 @@ class HeimdallDataset(Dataset):
         window         : Number of consecutive days of each sample.
         standardized   : If True, standardize each variable using its statistics (see VARIABLES_STANDARDIZATION).
         fill_with_nans : If True, the points without value (land, gaps of the observations) are NaN instead of 0.
+        coarsening     : Number of points averaged along the latitude and along the longitude (1 keeps the grid).
     """
 
     def __init__(
@@ -46,6 +47,7 @@ class HeimdallDataset(Dataset):
         window: int = 1,
         standardized: bool = True,
         fill_with_nans: bool = False,
+        coarsening: int = 1,
     ) -> None:
         super().__init__()
 
@@ -59,6 +61,7 @@ class HeimdallDataset(Dataset):
         self.window = window
         self.standardized = standardized
         self.fill_with_nans = fill_with_nans
+        self.coarsening = coarsening
         self.variables = DATASET_VARIABLES[modality]
         self.mean, self.std = get_weights_stats(modality)
 
@@ -81,7 +84,7 @@ class HeimdallDataset(Dataset):
     @cached_property
     def mesh(self) -> Tensor:
         r"""Sin/cos mesh of the latitude, longitude [and depth], (6, Z, Y, X) for GLORYS and (4, Y, X) otherwise."""
-        return get_weights_mesh(self.modality)
+        return get_weights_mesh(self.modality, self.coarsening)
 
     def __getstate__(self) -> dict:
         r"""Return the state of the dataset sent to a worker, without the opened store nor the mesh."""
@@ -137,6 +140,9 @@ class HeimdallDataset(Dataset):
         # L3 products have gaps (clouds, swaths), and land points never have a value
         mask = x.isfinite() & (self.mask > 0)
 
+        if self.coarsening > 1:
+            x, mask = coarsen(x, mask, self.coarsening)
+
         if self.standardized:
             x = (x - self.mean) / self.std
 
@@ -154,6 +160,7 @@ def get_datasets(
     window: int = 1,
     standardized: bool = True,
     fill_with_nans: bool = False,
+    coarsening: int = 1,
 ) -> tuple[HeimdallDataset, HeimdallDataset, HeimdallDataset]:
     r"""Create train, validation and test datasets of a modality using predefined date splits.
 
@@ -162,6 +169,7 @@ def get_datasets(
         window         : Number of consecutive days of each sample.
         standardized   : If True, standardize each variable using its statistics.
         fill_with_nans : If True, the points without value are NaN instead of 0.
+        coarsening     : Number of points averaged along the latitude and along the longitude.
 
     Returns:
         train : Training dataset
@@ -174,6 +182,7 @@ def get_datasets(
         "window": window,
         "standardized": standardized,
         "fill_with_nans": fill_with_nans,
+        "coarsening": coarsening,
     }
 
     return (

@@ -23,8 +23,9 @@ Training:
 
 Model:
     "modality"      : ["sss_des"]
+    "coarsening"    : [1]
     "checkpointing" : [true]
-    "dropout"       : [0.02]
+    "dropout"       : [0.00]
     "ffn_factor"    : [1]
     "kernel_size"   : [3]
     "lat_channels"  : [128]

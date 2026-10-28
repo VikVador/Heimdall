@@ -13,7 +13,8 @@ from torch import Tensor
 from typing import Any
 
 from heimdall.data import DATASET_PADDING, DATASET_REGION, DATASET_SHAPES, DATASET_VARIABLES
-from heimdall.data.weights import get_weights_mask, get_weights_mesh
+from heimdall.data.tools import coarsened_shape
+from heimdall.data.weights import get_weights_mesh
 
 
 def get_domain(modality: str) -> dict[str, list[int] | int]:
@@ -31,11 +32,12 @@ def get_domain(modality: str) -> dict[str, list[int] | int]:
 
 
 class Encoder(nn.Module):
-    r"""Creates the deterministic encoder of a modality, its fields and conditioning stacked with static inputs.
+    r"""Creates the deterministic encoder of a modality, its fields and date stacked with the mesh of its grid.
 
     Arguments:
         modality     : Name of the modality, a key of DATASET_VARIABLES.
         lat_channels : Number of latent channels C_z.
+        coarsening   : Number of points averaged along the latitude and along the longitude (1 keeps the grid).
         domain       : Domain the encoder was trained on (from its saved configuration), None for a new encoder.
         config       : Keyword arguments of the ConvEncoder (hid_channels, stride, ...).
     """
@@ -44,6 +46,7 @@ class Encoder(nn.Module):
         self,
         modality: str,
         lat_channels: int,
+        coarsening: int = 1,
         domain: dict[str, Any] | None = None,
         **config: Any,
     ) -> None:
@@ -57,18 +60,18 @@ class Encoder(nn.Module):
 
         self.modality = modality
         self.lat_channels = lat_channels
+        self.coarsening = coarsening
         self.domain = get_domain(modality)
 
-        # The land/sea mask and the sin/cos mesh are rebuilt at loading (not saved), in bfloat16 like the fields
-        static = torch.cat([get_weights_mask(modality), get_weights_mesh(modality)]).bfloat16()
+        # The sin/cos mesh is rebuilt at loading (not saved), in bfloat16 like the fields
+        static = get_weights_mesh(modality, coarsening).bfloat16()
         self.register_buffer("static", static, persistent=False)
 
-        # The inputs are the fields and the date, plus the observed points of each variable for the observations
-        variables = len(DATASET_VARIABLES[modality])
-        in_channels = (variables if modality == "glorys" else 2 * variables) + 2
+        # The inputs are the fields and the date, the network finding by itself the points without value (zeros)
+        in_channels = len(DATASET_VARIABLES[modality]) + 2
 
         # The encoder is deterministic, without modulation of the normalization layers
-        shape = DATASET_SHAPES[modality]
+        shape = coarsened_shape(DATASET_SHAPES[modality], coarsening)
         self.encoder = ConvEncoder(
             in_channels + len(static),
             lat_channels,
@@ -82,10 +85,10 @@ class Encoder(nn.Module):
         self.tokens = math.prod(self.shape)
 
     def forward(self, x: Tensor) -> Tensor:
-        r"""Encode fields and their conditioning into latent grids.
+        r"""Encode fields and their date into latent grids.
 
         Arguments:
-            x : Fields and their conditioning (B, C_i, [Z,] Y, X).
+            x : Fields and their date (B, C + 2, [Z,] Y, X).
 
         Returns:
             z : Latent grids (B, C_z, [Z',] Y', X').

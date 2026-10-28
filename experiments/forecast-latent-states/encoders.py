@@ -54,32 +54,33 @@ def _build_model(
 
 
 def forward_loss(
-    model    : torch.nn.Module,
-    batch    : tuple,
-    modality : str,
-    device   : torch.device,
+    model      : torch.nn.Module,
+    batch      : tuple,
+    modality   : str,
+    coarsening : int,
+    device     : torch.device,
 ) -> Tensor:
-    r"""Encode the fields of a batch, with their conditioning, and compute the GME loss between the fields and their latents.
+    r"""Encode the fields of a batch, with their date, and compute the GME loss between the fields and their latents.
 
     Arguments:
-        model    : Encoder, possibly wrapped by DDP.
-        batch    : Single day of the modality, with its observed points and date, from HeimdallDataset.
-        modality : Name of the modality, a key of DATASET_VARIABLES.
-        device   : Target device.
+        model      : Encoder, possibly wrapped by DDP.
+        batch      : Single day of the modality, with its date, from HeimdallDataset.
+        modality   : Name of the modality, a key of DATASET_VARIABLES.
+        coarsening : Number of points averaged along the latitude and along the longitude.
+        device     : Target device.
 
     Returns:
         loss : GME loss of the encoder.
     """
 
-    x, observed, dates = batch
-    x                  = x[:, 0].to(device)
+    x, _, dates = batch
+    x           = x[:, 0].to(device)
 
-    # The encoder is conditioned on the date (transposed by the collate) and on the observed points of the L3 products
-    date   = torch.cat([get_weights_date(d, modality, dim=2, device=device) for d in dates[0]]).to(x.dtype)
-    inputs = [x, date] if modality == "glorys" else [x, observed[:, 0].to(device, x.dtype), date]
+    # The encoder is conditioned on the date (transposed by the collate), the masks being left out of the inputs
+    date = torch.cat([get_weights_date(d, modality, coarsening, dim=2, device=device) for d in dates[0]]).to(x.dtype)
 
     with torch.amp.autocast(device_type=device.type, dtype=torch.bfloat16):
-        z = model(torch.cat(inputs, dim=1))
+        z = model(torch.cat([x, date], dim=1))
 
     # The loss only compares the geometry of the fields (distances in float32), the conditioning being an input
     return loss_geometry_embedding(x.float(), z.float())
@@ -96,7 +97,7 @@ def training(
     Arguments:
         config_state    : Saving option and checkpoint to resume from.
         config_training : Batch sizes, optimizer steps and learning rate schedule.
-        config_model    : Modality, latent channels and architecture of the encoder.
+        config_model    : Modality, coarsening, latent channels and architecture of the encoder.
         config_wandb    : Weights & Biases entity, project and mode.
     """
 
@@ -142,6 +143,7 @@ def training(
 
     # Loading the model from a checkpoint, or building it from scratch
     model, config = _build_model(config_model, checkpoint_name, device)
+    coarsening    = model.coarsening
 
     # The Weights & Biases run is named after the architecture
     run_name = generate_run_name(f"ENC_{modality}_lc{model.lat_channels}_tk{model.tokens}", checkpoint_name)
@@ -185,6 +187,7 @@ def training(
         is_distributed  = is_distributed,
         modality        = modality,
         window          = 1,
+        coarsening      = coarsening,
     )
 
     # Masks and meshes are identical on every process, there is no need to broadcast them
@@ -221,7 +224,7 @@ def training(
     for step, batch in enumerate(dataloader_training):
 
         # Forward pass and loss
-        loss = forward_loss(model, batch, modality, device)
+        loss = forward_loss(model, batch, modality, coarsening, device)
 
         # Gradient accumulation
         loss              = loss / steps_gradient_accumulation
@@ -277,7 +280,7 @@ def training(
             loss_validation = 0.0
             with torch.no_grad():
                 for _ in range(batches_validation):
-                    loss_validation += forward_loss(model, next(dataloader_validation), modality, device).item() / batches_validation
+                    loss_validation += forward_loss(model, next(dataloader_validation), modality, coarsening, device).item() / batches_validation
             model.train()
 
             if is_distributed:

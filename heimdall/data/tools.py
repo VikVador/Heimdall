@@ -2,6 +2,8 @@ r"""A collection of tools designed for data module."""
 
 __all__ = [
     "assert_date_format",
+    "coarsen",
+    "coarsened_shape",
     "count_halvings",
     "crop",
     "decode",
@@ -10,9 +12,11 @@ __all__ = [
 
 import numpy as np
 import re
+import torch
 import xarray as xr
 
 from pathlib import Path
+from torch import Tensor
 
 from heimdall.config import OSN_STORAGE
 
@@ -30,6 +34,49 @@ def assert_date_format(date_string: str) -> None:
     pattern = r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"
     if not re.match(pattern, date_string):
         raise ValueError("ERROR - The format is incorrect, it should be YYYY-MM-DD.")
+
+
+def coarsen(x: Tensor, mask: Tensor, factor: int) -> tuple[Tensor, Tensor]:
+    r"""Average blocks of factor × factor points along the latitude and longitude, over their points having a value.
+
+    Arguments:
+        x      : Fields (..., Y, X), any value where there is no value (e.g. NaN).
+        mask   : Points having a value, boolean of the shape of x.
+        factor : Number of points averaged along the latitude and along the longitude.
+
+    Returns:
+        x    : Coarsened fields (..., Y / factor, X / factor), NaN where a block has no value.
+        mask : Blocks having at least one value, boolean of the shape of the coarsened x.
+    """
+
+    *dims, lat, lon = coarsened_shape(x.shape, factor)
+
+    # Each block is averaged over its points having a value, a block without any becoming NaN
+    blocks = (*dims, lat, factor, lon, factor)
+    total = torch.where(mask, x, 0.0).reshape(blocks).sum(dim=(-3, -1))
+    count = mask.reshape(blocks).sum(dim=(-3, -1))
+
+    return total / count, count > 0
+
+
+def coarsened_shape(shape: tuple[int, ...], factor: int) -> tuple[int, ...]:
+    r"""Return the shape of a grid once coarsened along the latitude and longitude.
+
+    Arguments:
+        shape  : Shape of the grid ([Z,] Y, X).
+        factor : Number of points averaged along the latitude and along the longitude.
+
+    Returns:
+        shape : Coarsened shape ([Z,] Y / factor, X / factor).
+    """
+
+    *dims, lat, lon = shape
+
+    # Security
+    valid = lat % factor == 0 and lon % factor == 0
+    assert valid, f"ERROR - The grid ({lat}, {lon}) must be divisible by the factor {factor}."
+
+    return (*dims, lat // factor, lon // factor)
 
 
 def count_halvings(size: int) -> int:

@@ -2,9 +2,17 @@ r"""Tests for heimdall.tools and heimdall.data.tools."""
 
 import numpy as np
 import pytest
+import torch
 import xarray as xr
 
-from heimdall.data.tools import assert_date_format, count_halvings, crop, decode
+from heimdall.data.tools import (
+    assert_date_format,
+    coarsen,
+    coarsened_shape,
+    count_halvings,
+    crop,
+    decode,
+)
 from heimdall.tools import extract_model_hash, generate_run_name, get_wandb_hyperparameters
 
 
@@ -77,6 +85,48 @@ def test_decode_all_missing() -> None:
     )
 
     assert np.isnan(decode(da)).all()
+
+
+def test_coarsen_typical() -> None:
+    r"""Determines if blocks of points are averaged along the latitude and longitude, the depth being kept."""
+
+    x = torch.arange(32.0).reshape(2, 4, 4)
+    mask = torch.ones_like(x, dtype=torch.bool)
+
+    coarse, coarse_mask = coarsen(x, mask, factor=2)
+
+    assert coarse.shape == coarse_mask.shape == (2, 2, 2)
+    assert coarse_mask.all()
+    torch.testing.assert_close(coarse[0], torch.tensor([[2.5, 4.5], [10.5, 12.5]]))
+    torch.testing.assert_close(coarse[1], coarse[0] + 16)
+
+
+def test_coarsen_gaps() -> None:
+    r"""Determines if a block is averaged over its points having a value, and is NaN without any."""
+
+    x = torch.tensor([[1.0, torch.nan, 5.0, 7.0], [3.0, torch.nan, torch.nan, torch.nan]])
+    mask = x.isfinite()
+    mask[0, 3] = False  # e.g. a land point having a value
+
+    coarse, coarse_mask = coarsen(x, mask, factor=2)
+
+    assert coarse_mask.tolist() == [[True, True]]
+    torch.testing.assert_close(coarse, torch.tensor([[2.0, 5.0]]))
+
+    coarse, coarse_mask = coarsen(
+        torch.full((2, 2), torch.nan), torch.zeros(2, 2, dtype=torch.bool), 2
+    )
+
+    assert coarse.isnan().all() and not coarse_mask.any()
+
+
+def test_coarsened_shape_typical() -> None:
+    r"""Determines if only the latitude and longitude are coarsened, and a grid not divisible is rejected."""
+
+    assert coarsened_shape((48, 2016, 4320), 4) == (48, 504, 1080)
+    assert coarsened_shape((832, 1808), 1) == (832, 1808)
+    with pytest.raises(AssertionError, match="divisible"):
+        coarsened_shape((48, 2016, 4320), 64)
 
 
 def test_count_halvings_typical() -> None:
