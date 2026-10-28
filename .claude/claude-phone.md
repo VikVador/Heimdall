@@ -32,18 +32,18 @@ Remote Control of Claude Code.
 1. **Start** in a VSCode terminal on Torch: `claude-phone`. **Leave** without stopping it: **Ctrl+B**, then **D**.
 2. **Phone**: Claude app → **Code** tab → session **heimdall**.
 3. **One active session at a time**: never give work to the phone session and to VSCode simultaneously.
-4. **tmux is per node**: check or stop the session from the node where it runs (`torch-login-a-1`).
+4. **tmux is per node**: check or stop the session from the node where it runs; `claude-phone status` names it.
 5. **Phone answer mode**: short answers for a small screen, turned on with `/phone on`, off with `/phone off` (§ 5).
 
 ---
 
 ## 1. USAGE
 
-| Command               | Effect                                                                   |
-| --------------------- | ------------------------------------------------------------------------ |
-| `claude-phone`        | Starts the tmux session `claude` if needed, then attaches to it          |
-| `claude-phone stop`   | Kills the tmux session (and Claude with it)                              |
-| `claude-phone status` | Tells whether the session runs **on the current node** (prints its name) |
+| Command               | Effect                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| `claude-phone`        | Starts the tmux session `claude` if needed, then attaches to it                                |
+| `claude-phone stop`   | Kills the tmux session (and Claude with it)                                                    |
+| `claude-phone status` | Tells whether the session runs **on the current node**, otherwise on which node it was started |
 
 | Step | Where           | What                                                                            |
 | ---- | --------------- | ------------------------------------------------------------------------------- |
@@ -60,13 +60,14 @@ Remote Control of Claude Code.
 
 ## 2. HOW IT WORKS
 
-| Piece          | Details                                                                                               |
-| -------------- | ----------------------------------------------------------------------------------------------------- |
-| Script         | `~/bin/claude-phone` (in `PATH`, outside the repository)                                              |
-| Claude binary  | `claude` from `PATH` (standalone CLI in `~/.local/bin`), otherwise the latest one bundled with VSCode |
-| Command        | `claude remote-control` in a detached tmux session, from `~/heimdall`                                 |
-| Login node use | `nice -n 10`, `OMP_NUM_THREADS`, `MKL_NUM_THREADS` and `OPENBLAS_NUM_THREADS` set to 4 (shared nodes) |
-| Network        | outbound HTTPS to Anthropic: the phone needs neither the NYU VPN nor the 2FA                          |
+| Piece          | Details                                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------- |
+| Script         | `~/bin/claude-phone` (in `PATH`, outside the repository)                                                 |
+| Claude binary  | `claude` from `PATH` (standalone CLI in `~/.local/bin`), otherwise the latest one bundled with VSCode    |
+| Command        | `claude remote-control` in a detached tmux session, from `~/heimdall`                                    |
+| tmux socket    | `~/.tmux/claude-phone-<node>.sock`, not `/tmp` (cleaned by the node, which made the session unreachable) |
+| Login node use | `nice -n 10`, `OMP_NUM_THREADS`, `MKL_NUM_THREADS` and `OPENBLAS_NUM_THREADS` set to 4 (shared nodes)    |
+| Network        | outbound HTTPS to Anthropic: the phone needs neither the NYU VPN nor the 2FA                             |
 
 **Restart loop**
 
@@ -89,8 +90,8 @@ Remote Control of Claude Code.
 **Good to know**
 
 - **tmux is per node.** VSCode can reconnect to another login node (`torch-login-a-0`, `a-1`, `b-1`, `b-3`, …):
-  `claude-phone status` then says "not running". Go back with `ssh torch-login-a-1` before `claude-phone stop` or
-  attaching, otherwise you start a **second** session.
+  `claude-phone status` then says "not running" and names the node where the session was started. Go there with
+  `ssh <node>` before `claude-phone stop` or attaching, otherwise you start a **second** session.
 - **Login nodes are for light work.** The NYU docs do not forbid long, light processes there, but heavy work
   (training, analysis, transfers) goes through Slurm jobs or the DTN. Memory is capped at 2 GB per user (Claude uses
   ~350 MB). Ask hpc@nyu.edu in case of doubt.
