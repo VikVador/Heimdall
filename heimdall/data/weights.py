@@ -22,7 +22,7 @@ from heimdall.data import (
     DATASET_VARIABLES,
     VARIABLES_STANDARDIZATION,
 )
-from heimdall.data.tools import crop, open_zarr
+from heimdall.data.tools import coarsened_shape, crop, open_zarr
 
 
 def _prepare(
@@ -109,6 +109,7 @@ def get_weights_mask(
 
 def get_weights_mesh(
     modality: str,
+    coarsening: int = 1,
     *,
     dim: int = 1,
     device: torch.device | str | None = None,
@@ -116,26 +117,29 @@ def get_weights_mesh(
     r"""Build the sin/cos encoded mesh of a modality, the longitude being periodic and the depth logarithmic.
 
     Arguments:
-        modality : Name of the modality, a key of DATASET_VARIABLES.
-        dim      : Use 2 to add a leading batch dimension, 1 otherwise.
-        device   : Target device ("cpu" or "cuda").
+        modality   : Name of the modality, a key of DATASET_VARIABLES.
+        coarsening : Number of points averaged along the latitude and along the longitude.
+        dim        : Use 2 to add a leading batch dimension, 1 otherwise.
+        device     : Target device ("cpu" or "cuda").
 
     Returns:
         mesh : (sin, cos) of the latitude, longitude [and depth], (6, Z, Y, X) for GLORYS and (4, Y, X) otherwise.
     """
 
     mask = _mask_dataarray(modality)
+    shape = coarsened_shape(mask.shape, coarsening)
 
-    # Each coordinate is encoded along its own axis, then broadcast to the grid
+    # Each coordinate is encoded along its own axis, averaged over the coarsened blocks, then broadcast to the grid
     encodings = []
     for name, period in (("latitude", None), ("longitude", 360.0), ("depth", None)):
         if name in mask.dims:
             values = torch.tensor(mask[name].values, dtype=torch.float32)
             values = values.log() if name == "depth" else values
+            encoding = _encode_sin_cos(values, period)
+            if name != "depth":
+                encoding = encoding.unflatten(-1, (-1, coarsening)).mean(dim=-1)
             axes = [-1 if d == name else 1 for d in mask.dims]
-            encodings.append(
-                _encode_sin_cos(values, period).reshape(2, *axes).expand(2, *mask.shape)
-            )
+            encodings.append(encoding.reshape(2, *axes).expand(2, *shape))
 
     return _prepare(torch.cat(encodings), dim, device)
 
@@ -143,6 +147,7 @@ def get_weights_mesh(
 def get_weights_date(
     date: str,
     modality: str,
+    coarsening: int = 1,
     *,
     dim: int = 1,
     device: torch.device | str | None = None,
@@ -150,10 +155,11 @@ def get_weights_date(
     r"""Encode the year progress of a date with sin/cos, broadcast to the grid of a modality.
 
     Arguments:
-        date     : Date string 'YYYY-MM-DD'.
-        modality : Name of the modality, a key of DATASET_VARIABLES.
-        dim      : Use 2 to add a leading batch dimension, 1 otherwise.
-        device   : Target device ("cpu" or "cuda").
+        date       : Date string 'YYYY-MM-DD'.
+        modality   : Name of the modality, a key of DATASET_VARIABLES.
+        coarsening : Number of points averaged along the latitude and along the longitude.
+        dim        : Use 2 to add a leading batch dimension, 1 otherwise.
+        device     : Target device ("cpu" or "cuda").
 
     Returns:
         encoding : (sin, cos) of the year progress (2, [Z,] Y, X).
@@ -161,7 +167,7 @@ def get_weights_date(
 
     progress = Date.fromisoformat(date).timetuple().tm_yday / 366
     angle = torch.tensor(2 * torch.pi * progress)
-    shape = DATASET_SHAPES[modality]
+    shape = coarsened_shape(DATASET_SHAPES[modality], coarsening)
     encoding = torch.stack([angle.sin(), angle.cos()])
     encoding = encoding.reshape(2, *[1] * len(shape)).expand(2, *shape)
 

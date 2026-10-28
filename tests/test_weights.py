@@ -38,6 +38,9 @@ def test_get_weights_date_shape() -> None:
         encoding = get_weights_date("2020-07-01", modality, dim=2)
         assert encoding.shape == (1, 2, *DATASET_SHAPES[modality])
 
+    encoding = get_weights_date("2020-07-01", "glorys", coarsening=4)
+    assert encoding.shape == (2, 48, 504, 1080)
+
 
 @pytest.mark.integration
 @pytest.mark.parametrize("modality", MODALITIES)
@@ -54,3 +57,16 @@ def test_get_weights_typical(modality: str) -> None:
     assert mesh.abs().max() <= 1.0
     assert mean.shape == std.shape == (len(DATASET_VARIABLES[modality]), *shape[:-2], 1, 1)
     assert (std > 0).all() and mean.isfinite().all()
+
+
+@pytest.mark.integration
+def test_get_weights_mesh_coarsening() -> None:
+    r"""Determines if the coarsened mesh is the average of the mesh over each block of points."""
+
+    mesh, coarse = get_weights_mesh("wind_asc"), get_weights_mesh("wind_asc", coarsening=4)
+    lat, lon = DATASET_SHAPES["wind_asc"]
+
+    assert coarse.shape == (4, lat // 4, lon // 4)
+    torch.testing.assert_close(
+        coarse, mesh.unflatten(1, (-1, 4)).unflatten(-1, (-1, 4)).mean(dim=(2, 4))
+    )

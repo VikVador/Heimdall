@@ -60,6 +60,24 @@ def test_heimdall_dataset_padding() -> None:
 
 
 @pytest.mark.integration
+def test_heimdall_dataset_coarsening() -> None:
+    r"""Determines if GLORYS is averaged along the latitude and longitude, keeping all its levels."""
+
+    full = HeimdallDataset("2012-08-01", "2012-08-01", modality="glorys", standardized=False)
+    coarse = HeimdallDataset(
+        "2012-08-01", "2012-08-01", modality="glorys", standardized=False, coarsening=4
+    )
+    x, mask, _ = full[0]
+    x_coarse, mask_coarse, _ = coarse[0]
+
+    assert x_coarse.shape == mask_coarse.shape == (1, 4, 48, 504, 1080)
+    assert (x_coarse[~mask_coarse] == 0).all()
+    assert mask[0, 0, 0, 400:404, 800:804].all()  # A block of the South Pacific, only sea points
+    torch.testing.assert_close(x_coarse[0, 0, 0, 100, 200], x[0, 0, 0, 400:404, 800:804].mean())
+    assert mask_coarse.float().mean() >= mask.float().mean()
+
+
+@pytest.mark.integration
 def test_heimdall_dataset_mask_per_variable() -> None:
     r"""Determines if a variable keeps its values where another variable of the modality has none (GLORYS coasts)."""
 
