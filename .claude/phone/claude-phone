@@ -8,6 +8,15 @@ PROJECT_DIR="${CLAUDE_PHONE_DIR:-$HOME/heimdall}"
 PROJECT_NAME="$(basename "$PROJECT_DIR")"
 MODE="${CLAUDE_PHONE_MODE:-acceptEdits}"
 
+# The tmux socket lives in the home directory, named after the node: the cleaning of /tmp can no longer
+# make the session unreachable, and the socket files tell on which node a session was started.
+SOCKET_DIR="$HOME/.tmux"
+SOCKET="$SOCKET_DIR/claude-phone-$(hostname -s).sock"
+
+tm() {
+    tmux -S "$SOCKET" "$@"
+}
+
 usage() {
     echo "Usage: claude-phone [start|stop|status]"
     echo "  start  (default) Start the Remote Control session in tmux and attach to it."
@@ -58,36 +67,47 @@ run_loop() {
 start() {
     local cli
     cli=$(resolve_cli)
-    if ! tmux has-session -t "$SESSION" 2> /dev/null; then
+    if ! tm has-session -t "$SESSION" 2> /dev/null; then
+        mkdir -p "$SOCKET_DIR" && chmod 700 "$SOCKET_DIR"
+        rm -f "$SOCKET"
         local threads="export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 CLAUDE_PHONE=1"
         local call
         call="run_loop $(printf '%q ' "$cli" "$PROJECT_NAME" "$MODE")"
-        tmux new-session -d -s "$SESSION" -c "$PROJECT_DIR" bash -c "$threads; $(declare -f run_loop); $call"
+        tm new-session -d -s "$SESSION" -c "$PROJECT_DIR" bash -c "$threads; $(declare -f run_loop); $call"
         echo "Started '$SESSION' on $(hostname -s) in $PROJECT_DIR (mode $MODE)."
     fi
-    if [[ -n "${TMUX:-}" ]]; then
-        tmux switch-client -t "$SESSION"
-    else
-        tmux attach -t "$SESSION"
-    fi
+    tm attach -t "$SESSION"
 }
 
 stop() {
-    if tmux has-session -t "$SESSION" 2> /dev/null; then
-        tmux kill-session -t "$SESSION"
+    if tm has-session -t "$SESSION" 2> /dev/null; then
+        tm kill-session -t "$SESSION"
         echo "Stopped '$SESSION' on $(hostname -s)."
     else
         echo "No '$SESSION' session on $(hostname -s)."
+        other_nodes
     fi
+    rm -f "$SOCKET"
 }
 
 status() {
-    # tmux is per node: a session started on another login node is invisible from here.
-    if tmux has-session -t "$SESSION" 2> /dev/null; then
+    if tm has-session -t "$SESSION" 2> /dev/null; then
         echo "'$SESSION' is running on $(hostname -s)."
     else
-        echo "'$SESSION' is not running on $(hostname -s) (tmux is per node, check the node where you started it)."
+        echo "'$SESSION' is not running on $(hostname -s)."
+        other_nodes
     fi
+}
+
+other_nodes() {
+    # tmux is per node: a session started on another login node can only be reached from that node.
+    local socket node
+    for socket in "$SOCKET_DIR"/claude-phone-*.sock; do
+        [[ -e "$socket" && "$socket" != "$SOCKET" ]] || continue
+        node=$(basename "$socket" .sock)
+        node=${node#claude-phone-}
+        echo "A session was started on $node: run 'ssh $node' then 'claude-phone status' (or stop)."
+    done
 }
 
 case "${1:-start}" in
