@@ -23,6 +23,7 @@ Training:
 
 Model:
     "modality"      : ["wind_des"]
+    "coarsening"    : [1]
     "checkpointing" : [true]
     "dropout"       : [0.02]
     "ffn_factor"    : [1]

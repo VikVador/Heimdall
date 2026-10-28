@@ -23,6 +23,7 @@ Training:
 
 Model:
     "modality"      : ["glorys"]
+    "coarsening"    : [4]
     "checkpointing" : [true]
     "dropout"       : [0.02]
     "ffn_factor"    : [1]
@@ -34,6 +35,6 @@ Model:
         [2, 2, 2],
         [2, 2, 2],
         [2, 2, 2],
-        [2, 2, 2],
-        [1, 2, 2],
+        [2, 1, 1],
+        [1, 1, 1],
     ]]
