@@ -55,7 +55,11 @@ FOLDERS = {
 
 # Creating path to data files
 PATH_MASKS    = {modality: f"{folder}/mask.zarr" for modality, folder in FOLDERS.items()}
-PATH_STATS    = {modality: f"{folder}/statistics.zarr" for modality, folder in FOLDERS.items()}
+
+# Statistics of the training period of each dataset, on Torch until they are written on OSN
+PATH_STATS = {
+    modality: PATH_PROJECT / "datasets" / f"statistics-{modality}.json" for modality in FOLDERS
+}
 
 # Days left out of each dataset (too few values), on Torch until they are written on OSN
 PATH_EXCLUDED_DAYS = {

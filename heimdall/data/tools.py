@@ -7,9 +7,13 @@ __all__ = [
     "count_halvings",
     "crop",
     "decode",
+    "load_json",
+    "moments",
     "open_zarr",
 ]
 
+import fsspec
+import json
 import numpy as np
 import re
 import torch
@@ -17,6 +21,7 @@ import xarray as xr
 
 from pathlib import Path
 from torch import Tensor
+from typing import Any
 
 from heimdall.config import OSN_STORAGE
 
@@ -123,6 +128,45 @@ def crop(
         )
 
     return data.isel(indices)
+
+
+def load_json(path: str | Path) -> Any:
+    r"""Load a json file, on Torch or on OSN.
+
+    Arguments:
+        path : Local path of the file, or its URL on OSN ('s3://...').
+
+    Returns:
+        content : Content of the file, or None if the file does not exist.
+    """
+
+    path = str(path)
+    fs, _ = fsspec.core.url_to_fs(path, **(OSN_STORAGE if path.startswith("s3://") else {}))
+    if not fs.exists(path):
+        return None
+
+    with fs.open(path) as file:
+        return json.load(file)
+
+
+def moments(x: Tensor) -> Tensor:
+    r"""Count, sum and sum of squares of the values of each field, ignoring NaN, in float64.
+
+    Arguments:
+        x : Fields (..., Y, X), NaN where there is no value.
+
+    Returns:
+        moments : Count, sum and sum of squares over the latitude and longitude (3, ...).
+    """
+
+    valid = x.isfinite()
+    x = torch.where(valid, x, 0.0).double()
+
+    return torch.stack([
+        valid.sum(dim=(-2, -1)).double(),
+        x.sum(dim=(-2, -1)),
+        x.square().sum(dim=(-2, -1)),
+    ])
 
 
 def open_zarr(path: str | Path) -> xr.Dataset:

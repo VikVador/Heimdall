@@ -1,9 +1,12 @@
 r"""Tests for heimdall.tools and heimdall.data.tools."""
 
+import json
 import numpy as np
 import pytest
 import torch
 import xarray as xr
+
+from pathlib import Path
 
 from heimdall.data.tools import (
     assert_date_format,
@@ -12,6 +15,8 @@ from heimdall.data.tools import (
     count_halvings,
     crop,
     decode,
+    load_json,
+    moments,
 )
 from heimdall.tools import extract_model_hash, generate_run_name, get_wandb_hyperparameters
 
@@ -194,3 +199,23 @@ def test_decode_retry() -> None:
     np.testing.assert_array_equal(decode(FlakyArray(failures=2)), [1.0, 2.0])
     with pytest.raises(RuntimeError):
         decode(FlakyArray(failures=3))
+
+
+def test_moments_typical() -> None:
+    r"""Determines if the count, sum and sum of squares of each field ignore its NaN, an empty field giving zeros."""
+
+    x = torch.tensor([[[1.0, 2.0], [float("nan"), 3.0]], [[float("nan")] * 2] * 2])
+
+    torch.testing.assert_close(
+        moments(x), torch.tensor([[3.0, 0.0], [6.0, 0.0], [14.0, 0.0]], dtype=torch.float64)
+    )
+
+
+def test_load_json_typical(tmp_path: Path) -> None:
+    r"""Determines if a json file is loaded, a missing file giving None."""
+
+    path = tmp_path / "days.json"
+    path.write_text(json.dumps(["2010-04-23"]))
+
+    assert load_json(path) == ["2010-04-23"]
+    assert load_json(tmp_path / "missing.json") is None
