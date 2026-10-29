@@ -3,7 +3,7 @@ r"""Tests for heimdall.data.dataset."""
 import pytest
 import torch
 
-from heimdall.data import DATASET_PADDING, DATASET_SHAPES, DATASET_VARIABLES
+from heimdall.data import DATASET_PADDING, DATASET_SHAPES, DATASET_VARIABLES, VARIABLES_BOUNDS
 from heimdall.data.dataset import HeimdallDataset
 
 
@@ -87,3 +87,28 @@ def test_heimdall_dataset_mask_per_variable() -> None:
 
     assert (thetao & ~uo).any()  # Coastal points with a temperature but no current
     assert (x[0, 0][thetao & ~uo] != 0).any()
+
+
+@pytest.mark.integration
+def test_heimdall_dataset_bounds() -> None:
+    r"""Determines if the values outside the physical bounds are missing (salinity of -2.75 in the Laptev Sea)."""
+
+    dataset = HeimdallDataset(
+        "2012-09-02", "2012-09-02", modality="sss_asc", standardized=False, fill_with_nans=True
+    )
+    x, mask, _ = dataset[0]
+    low, high = VARIABLES_BOUNDS["Sea_Surface_Salinity"]
+
+    assert mask.any()
+    assert (x[mask] >= low).all() and (x[mask] <= high).all()
+
+
+@pytest.mark.integration
+def test_heimdall_dataset_excluded_days() -> None:
+    r"""Determines if the excluded days are left out, the windows joining the remaining days."""
+
+    dataset = HeimdallDataset(
+        "2012-08-01", "2012-08-03", modality="sst", excluded_days=["2012-08-02"]
+    )
+
+    assert dataset.dates == ["2012-08-01", "2012-08-03"]

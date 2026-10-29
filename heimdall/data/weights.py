@@ -66,6 +66,39 @@ def _mask_dataarray(modality: str) -> xr.DataArray:
     return crop(mask, DATASET_REGION[modality], DATASET_PADDING[modality]).load()
 
 
+def _nearest(values: np.ndarray, grid: np.ndarray) -> np.ndarray:
+    r"""Find the index of the closest point of an ascending grid for each value.
+
+    Arguments:
+        values : Coordinates to look for (N,).
+        grid   : Coordinates of the grid, sorted in ascending order (M,).
+
+    Returns:
+        indices : Index of the closest grid point of each value (N,).
+    """
+
+    i = np.clip(np.searchsorted(grid, values), 1, len(grid) - 1)
+
+    return np.where(values - grid[i - 1] < grid[i] - values, i - 1, i)
+
+
+def _ocean(mask: xr.DataArray) -> np.ndarray:
+    r"""Find the points of a grid that are ocean in GLORYS at the surface, the closest GLORYS point deciding.
+
+    Arguments:
+        mask : Land/sea mask of an observation product (Y, X), with its coordinates.
+
+    Returns:
+        ocean : Points of the grid that are ocean in GLORYS, boolean (Y, X).
+    """
+
+    glorys = open_zarr(PATH_MASKS["glorys"]).mask.isel(depth=0)
+    y = _nearest(mask.latitude.values, glorys.latitude.values)
+    x = _nearest(mask.longitude.values, glorys.longitude.values)
+
+    return glorys.values[np.ix_(y, x)] > 0
+
+
 def _encode_sin_cos(values: Tensor, period: float | None = None) -> Tensor:
     r"""Encode a coordinate with sin/cos, over its period or rescaled to [0, π] over its range.
 
@@ -91,7 +124,7 @@ def get_weights_mask(
     dim: int = 1,
     device: torch.device | str | None = None,
 ) -> Tensor:
-    r"""Load the land/sea mask of a modality.
+    r"""Load the land/sea mask of a modality, the sea of an observation product being restricted to the ocean.
 
     Arguments:
         modality : Name of the modality, a key of DATASET_VARIABLES.
@@ -102,7 +135,14 @@ def get_weights_mask(
         mask : Binary mask (1, [Z,] Y, X), with 1 on sea and 0 on land.
     """
 
-    mask = torch.as_tensor(_mask_dataarray(modality).values, dtype=torch.float32)[None]
+    mask = _mask_dataarray(modality)
+    sea = mask.values > 0
+
+    # The satellites also observe lakes (e.g. Titicaca), which are not part of the ocean of GLORYS
+    if modality != "glorys":
+        sea &= _ocean(mask)
+
+    mask = torch.as_tensor(sea, dtype=torch.float32)[None]
 
     return _prepare(mask, dim, device)
 

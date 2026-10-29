@@ -1,7 +1,7 @@
 r"""Information about our datasets, the GLORYS states and the surface observations."""
 
 __all__ = [
-    "VARIABLES_CLIPPING",
+    "VARIABLES_BOUNDS",
     "VARIABLES_STANDARDIZATION",
     "DATASET_DATES_TRAINING",
     "DATASET_DATES_VALIDATION",
@@ -17,10 +17,17 @@ __all__ = [
 #
 # ----- Preprocessing
 #
-VARIABLES_CLIPPING = {
-    "so"                   : (0, None),
-    "Sea_Surface_Salinity" : (0, None),
-    "CHL"                  : (0, None),
+# Physical bounds of each variable, in the units of its store (SST in kelvin), a value outside being an error
+VARIABLES_BOUNDS = {
+    "thetao"                  : (-2.5,   40.0),
+    "so"                      : (0.0,    45.0),
+    "uo"                      : (-4.0,   4.0),
+    "vo"                      : (-4.0,   4.0),
+    "sea_surface_temperature" : (271.0,  313.15),
+    "Sea_Surface_Salinity"    : (2.0,    42.0),
+    "eastward_wind"           : (-40.0,  40.0),
+    "northward_wind"          : (-40.0,  40.0),
+    "CHL"                     : (0.01,   100.0),
 }
 
 VARIABLES_STANDARDIZATION = {
