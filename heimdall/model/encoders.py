@@ -68,13 +68,16 @@ class Encoder(nn.Module):
         self.register_buffer("static", static, persistent=False)
 
         # The inputs are the fields and the date, the network finding by itself the points without value (zeros)
-        in_channels = len(DATASET_VARIABLES[modality]) + 2
+        variables = len(DATASET_VARIABLES[modality])
+        in_channels = variables + 2
 
-        # The encoder is deterministic, without modulation of the normalization layers
+        # The encoder is deterministic, without modulation of the normalization layers, and a pointwise
+        # convolution first mixes the fields, date and mesh into as many channels as there are variables
         shape = coarsened_shape(DATASET_SHAPES[modality], coarsening)
         self.encoder = ConvEncoder(
             in_channels + len(static),
             lat_channels,
+            mix_channels=variables,
             spatial=len(shape),
             mod_features=None,
             **config,
