@@ -45,6 +45,17 @@ def test_encoder_coarsening() -> None:
 
 
 @pytest.mark.integration
+def test_encoder_mixing() -> None:
+    r"""Determines if the inputs are first mixed into as many channels as there are variables."""
+
+    model = Encoder("glorys", lat_channels=8, coarsening=4, **CONFIG)
+    mix = model.encoder.mix
+
+    assert (mix.in_channels, mix.out_channels) == (4 + 2 + 6, 4)
+    assert mix.kernel_size == (1, 1, 1)
+
+
+@pytest.mark.integration
 def test_encoder_other_domain() -> None:
     r"""Determines if an encoder trained on another domain is rejected."""
 
