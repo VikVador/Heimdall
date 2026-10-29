@@ -16,7 +16,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from heimdall.config import PATH_MODELS
 from heimdall.data.dataloader import get_dataloaders
-from heimdall.data.weights import get_weights_date
+from heimdall.data.weights import get_weights_change, get_weights_date, get_weights_stats
 from heimdall.distributed import reduce_mean, setup_distributed
 from heimdall.model.encoders import Encoder
 from heimdall.schedulers import warmup_cosine_decay
@@ -58,6 +58,7 @@ def forward_loss(
     batch      : tuple,
     modality   : str,
     coarsening : int,
+    scale      : Tensor,
     device     : torch.device,
 ) -> Tensor:
     r"""Encode the fields of a batch, with their date, and compute the GME loss between the fields and their latents.
@@ -67,6 +68,7 @@ def forward_loss(
         batch      : Single day of the modality, with its date, from HeimdallDataset.
         modality   : Name of the modality, a key of DATASET_VARIABLES.
         coarsening : Number of points averaged along the latitude and along the longitude.
+        scale      : Ratio of the std of each variable to the std of its change from one day to the next.
         device     : Target device.
 
     Returns:
@@ -82,8 +84,9 @@ def forward_loss(
     with torch.amp.autocast(device_type=device.type, dtype=torch.bfloat16):
         z = model(torch.cat([x, date], dim=1))
 
-    # The loss only compares the geometry of the fields (distances in float32), the conditioning being an input
-    return loss_geometry_embedding(x.float(), z.float())
+    # The loss only compares the geometry of the fields (distances in float32), the conditioning being an input,
+    # measured in typical changes from one day to the next so that every variable weighs in the distances
+    return loss_geometry_embedding(x.float() * scale, z.float())
 
 
 def training(
@@ -144,6 +147,10 @@ def training(
     # Loading the model from a checkpoint, or building it from scratch
     model, config = _build_model(config_model, checkpoint_name, device)
     coarsening    = model.coarsening
+
+    # A variable whose std is mostly geographical (e.g. the temperature) changes little in standard deviations
+    _, std = get_weights_stats(modality, dim=2, device=device)
+    scale  = std / get_weights_change(modality, dim=2, device=device)
 
     # The Weights & Biases run is named after the architecture
     run_name = generate_run_name(f"ENC_{modality}_lc{model.lat_channels}_tk{model.tokens}", checkpoint_name)
@@ -224,7 +231,7 @@ def training(
     for step, batch in enumerate(dataloader_training):
 
         # Forward pass and loss
-        loss = forward_loss(model, batch, modality, coarsening, device)
+        loss = forward_loss(model, batch, modality, coarsening, scale, device)
 
         # Gradient accumulation
         loss              = loss / steps_gradient_accumulation
@@ -280,7 +287,7 @@ def training(
             loss_validation = 0.0
             with torch.no_grad():
                 for _ in range(batches_validation):
-                    loss_validation += forward_loss(model, next(dataloader_validation), modality, coarsening, device).item() / batches_validation
+                    loss_validation += forward_loss(model, next(dataloader_validation), modality, coarsening, scale, device).item() / batches_validation
             model.train()
 
             if is_distributed:
