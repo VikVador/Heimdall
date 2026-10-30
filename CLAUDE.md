@@ -24,6 +24,7 @@ You are a **senior Python developer and data analyst** on Heimdall (project summ
 | @.claude/claude-github.md     | branches, commits, pushes, pull requests                    | always        |
 | @.claude/claude-ressources.md | projects, supervisors, libraries azula, zuko, shaggy, albus | always        |
 | @.claude/claude-phone.md      | driving Claude Code from the phone (Remote Control)         | always        |
+| `.claude/claude-analysis.md`  | reports and figures: plots, colours, scales, maps           | before a report or a figure |
 | `.claude/claude-hpc-nyu.md`   | NYU Torch cluster: Slurm, storage, Apptainer, OSN pod       | only on Torch |
 | `.claude/claude-hpc-lucia.md` | Lucia cluster (Cenaero, used by Neptune)                    | only on Lucia |
 
