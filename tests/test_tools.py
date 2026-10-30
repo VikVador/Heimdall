@@ -16,6 +16,7 @@ from heimdall.data.tools import (
     crop,
     decode,
     load_json,
+    load_npy,
     moments,
 )
 from heimdall.tools import extract_model_hash, generate_run_name, get_wandb_hyperparameters
@@ -219,3 +220,13 @@ def test_load_json_typical(tmp_path: Path) -> None:
 
     assert load_json(path) == ["2010-04-23"]
     assert load_json(tmp_path / "missing.json") is None
+
+
+def test_load_npy_typical(tmp_path: Path) -> None:
+    r"""Determines if a numpy file is loaded, a missing file giving None."""
+
+    path = tmp_path / "columns.npy"
+    np.save(path, np.array([[True, False]]))
+
+    np.testing.assert_array_equal(load_npy(path), [[True, False]])
+    assert load_npy(tmp_path / "missing.npy") is None

@@ -11,6 +11,7 @@ __all__ = [
     "PATH_MASKS",
     "PATH_STATS",
     "PATH_EXCLUDED_DAYS",
+    "PATH_ARTEFACTS",
 ]
 
 import os
@@ -54,17 +55,13 @@ FOLDERS = {
 }
 
 # Creating path to data files
-PATH_MASKS    = {modality: f"{folder}/mask.zarr" for modality, folder in FOLDERS.items()}
+PATH_MASKS          = {modality: f"{folder}/mask.zarr" for modality, folder in FOLDERS.items()}
+PATH_STATS          = {modality: f"{folder}/statistics-{modality}.json" for modality, folder in FOLDERS.items()}
+PATH_EXCLUDED_DAYS  = {modality: f"{folder}/excluded-days-{modality}.json" for modality, folder in FOLDERS.items()}
 
-# Statistics of the training period of each dataset, on Torch until they are written on OSN
-PATH_STATS = {
-    modality: PATH_PROJECT / "datasets" / f"statistics-{modality}.json" for modality in FOLDERS
-}
-
-# Days left out of each dataset (too few values), on Torch until they are written on OSN
-PATH_EXCLUDED_DAYS = {
-    modality: PATH_PROJECT / "datasets" / f"excluded-days-{modality}.json" for modality in FOLDERS
-}
+# Columns of GLORYS with values out of their physical bounds on many days (fixed artefacts of the model), the
+# observations keeping their gaps (their contaminations by ice or RFI are transient)
+PATH_ARTEFACTS = {"glorys": f"{GLORYS}/artefacts-glorys.npy"}
 
 PATH_DATASETS = {
     "glorys"   : f"{GLORYS}/cmems_glorys_2000-2025_daily_4320x2041x50.zarr",

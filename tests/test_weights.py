@@ -4,7 +4,9 @@ import numpy as np
 import pytest
 import torch
 
+from heimdall.config import PATH_ARTEFACTS
 from heimdall.data import DATASET_SHAPES, DATASET_VARIABLES, MODALITIES
+from heimdall.data.tools import load_npy
 from heimdall.data.weights import (
     _encode_sin_cos,
     _mask_dataarray,
@@ -102,3 +104,15 @@ def test_get_weights_mask_lakes() -> None:
     assert point(-15.8, -69.4) == 0.0  # Lake Titicaca
     assert point(-17.0, 27.8) == 0.0  # Lake Kariba
     assert point(-30.0, -120.0) == 1.0  # South Pacific
+
+
+@pytest.mark.integration
+def test_get_weights_mask_artefacts() -> None:
+    r"""Determines if the artefact columns of GLORYS are land at every level, the other sea points staying sea."""
+
+    artefacts = load_npy(PATH_ARTEFACTS["glorys"])
+    mask = get_weights_mask("glorys")[0]
+
+    assert artefacts is not None and artefacts.shape == mask.shape[1:] and artefacts.any()
+    assert (mask[:, torch.from_numpy(artefacts)] == 0).all()
+    assert mask[0].sum() > 0.9 * (_mask_dataarray("glorys").values[0] > 0).sum()

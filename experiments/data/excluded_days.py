@@ -6,8 +6,11 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 
-from heimdall.config import PATH_EXCLUDED_DAYS
+from heimdall.config import PATH_PROJECT
 from heimdall.data.dataset import HeimdallDataset
+
+# Written on Torch, then copied with rclone to the folder of the dataset on OSN (see its README)
+PATH_OUTPUT = PATH_PROJECT / "datasets"
 
 # A day is left out when it has fewer values than this share of the median day
 SHARE_OF_MEDIAN = 0.1
@@ -50,7 +53,7 @@ if __name__ == "__main__":
         d for d, c in zip(dates, counts, strict=True) if c < SHARE_OF_MEDIAN * np.median(counts)
     ]
 
-    path = PATH_EXCLUDED_DAYS[args.modality]
+    path = PATH_OUTPUT / f"excluded-days-{args.modality}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(excluded, indent=1))
     print(f"{args.modality}: {len(excluded)} days left out of {len(dates)}, written to {path}")
