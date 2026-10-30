@@ -28,6 +28,7 @@ Model:
     "dropout"       : [0.00]
     "ffn_factor"    : [1]
     "kernel_size"   : [3]
+    "patch_size"    : [1]
     "lat_channels"  : [128]
     "hid_channels"  : [[32, 64, 128, 256, 512]]
     "hid_blocks"    : [[3, 3, 3, 3, 3]]

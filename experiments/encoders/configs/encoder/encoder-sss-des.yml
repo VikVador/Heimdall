@@ -9,9 +9,9 @@ State:
 
 Training:
     "batch_size_per_step" : [32]
-    "batch_size_per_gpu"  : [8]
+    "batch_size_per_gpu"  : [16]
     "batches_validation"  : [4]
-    "steps_update"        : [16384]
+    "steps_update"        : [25600]
     "steps_logging"       : [4]
     "steps_validation"    : [64]
     "num_workers"         : [6]
@@ -22,17 +22,17 @@ Training:
     "learning_rate_end"   : [0.00001]
 
 Model:
-    "modality"      : ["sst"]
+    "modality"      : ["sss_des"]
     "coarsening"    : [1]
     "checkpointing" : [true]
     "dropout"       : [0.00]
     "ffn_factor"    : [1]
     "kernel_size"   : [3]
+    "patch_size"    : [1]
     "lat_channels"  : [128]
-    "hid_channels"  : [[16, 32, 64, 128, 256, 512]]
-    "hid_blocks"    : [[3, 3, 3, 3, 3, 3]]
+    "hid_channels"  : [[32, 64, 128, 256, 512]]
+    "hid_blocks"    : [[3, 3, 3, 3, 3]]
     "stride"        : [[
-        [2, 2],
         [2, 2],
         [2, 2],
         [2, 2],

@@ -32,7 +32,7 @@ export MASTER_PORT=$((10000 + $(echo -n $SLURM_JOBID | tail -c 4)))
 export WORLD_SIZE=$SLURM_NTASKS
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-cd experiments/forecast-latent-states
+cd experiments/encoders
 
 srun apptainer exec --nv --overlay $OVERLAY:ro $IMAGE bash -c "
     source /ext3/env.sh
