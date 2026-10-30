@@ -10,6 +10,7 @@ __all__ = [
     "PATH_DATASETS",
     "PATH_MASKS",
     "PATH_STATS",
+    "PATH_EXCLUDED_DAYS",
 ]
 
 import os
@@ -55,6 +56,11 @@ FOLDERS = {
 # Creating path to data files
 PATH_MASKS    = {modality: f"{folder}/mask.zarr" for modality, folder in FOLDERS.items()}
 PATH_STATS    = {modality: f"{folder}/statistics.zarr" for modality, folder in FOLDERS.items()}
+
+# Days left out of each dataset (too few values), on Torch until they are written on OSN
+PATH_EXCLUDED_DAYS = {
+    modality: PATH_PROJECT / "datasets" / f"excluded-days-{modality}.json" for modality in FOLDERS
+}
 
 PATH_DATASETS = {
     "glorys"   : f"{GLORYS}/cmems_glorys_2000-2025_daily_4320x2041x50.zarr",

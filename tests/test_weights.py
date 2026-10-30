@@ -1,11 +1,14 @@
 r"""Tests for heimdall.data.weights."""
 
+import numpy as np
 import pytest
 import torch
 
 from heimdall.data import DATASET_SHAPES, DATASET_VARIABLES, MODALITIES
 from heimdall.data.weights import (
     _encode_sin_cos,
+    _mask_dataarray,
+    _nearest,
     get_weights_date,
     get_weights_mask,
     get_weights_mesh,
@@ -70,3 +73,29 @@ def test_get_weights_mesh_coarsening() -> None:
     torch.testing.assert_close(
         coarse, mesh.unflatten(1, (-1, 4)).unflatten(-1, (-1, 4)).mean(dim=(2, 4))
     )
+
+
+def test_nearest_typical() -> None:
+    r"""Determines if each value gets the index of its closest grid point, values outside the grid getting its ends."""
+
+    grid = np.array([0.0, 1.0, 2.0, 3.0])
+    indices = _nearest(np.array([-5.0, 0.4, 0.6, 2.5001, 9.0]), grid)
+
+    np.testing.assert_array_equal(indices, [0, 0, 1, 3, 3])
+
+
+@pytest.mark.integration
+def test_get_weights_mask_lakes() -> None:
+    r"""Determines if the lakes observed by the satellites are land, the open ocean staying sea."""
+
+    mask = _mask_dataarray("chl")
+    weights = get_weights_mask("chl")[0]
+    lat, lon = mask.latitude.values, mask.longitude.values
+
+    def point(y: float, x: float) -> float:
+        r"""Return the mask at the closest point of a latitude and longitude."""
+        return weights[np.abs(lat - y).argmin(), np.abs(lon - x).argmin()].item()
+
+    assert point(-15.8, -69.4) == 0.0  # Lake Titicaca
+    assert point(-17.0, 27.8) == 0.0  # Lake Kariba
+    assert point(-30.0, -120.0) == 1.0  # South Pacific

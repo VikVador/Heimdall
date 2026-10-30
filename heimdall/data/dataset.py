@@ -3,15 +3,19 @@ r"""Dataset."""
 __all__ = [
     "HeimdallDataset",
     "get_datasets",
+    "get_excluded_days",
 ]
 
+import fsspec
+import json
 import torch
 
+from collections.abc import Sequence
 from functools import cached_property
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from heimdall.config import PATH_DATASETS
+from heimdall.config import OSN_STORAGE, PATH_DATASETS, PATH_EXCLUDED_DAYS
 from heimdall.data import (
     DATASET_DATES_TEST,
     DATASET_DATES_TRAINING,
@@ -20,7 +24,7 @@ from heimdall.data import (
     DATASET_REGION,
     DATASET_VARIABLES,
     MODALITIES,
-    VARIABLES_CLIPPING,
+    VARIABLES_BOUNDS,
 )
 from heimdall.data.tools import assert_date_format, coarsen, crop, decode, open_zarr
 from heimdall.data.weights import get_weights_mask, get_weights_mesh, get_weights_stats
@@ -37,6 +41,7 @@ class HeimdallDataset(Dataset):
         standardized   : If True, standardize each variable using its statistics (see VARIABLES_STANDARDIZATION).
         fill_with_nans : If True, the points without value (land, gaps of the observations) are NaN instead of 0.
         coarsening     : Number of points averaged along the latitude and along the longitude (1 keeps the grid).
+        excluded_days  : Days left out of the dataset (format: 'YYYY-MM-DD'), e.g. days without observation.
     """
 
     def __init__(
@@ -48,6 +53,7 @@ class HeimdallDataset(Dataset):
         standardized: bool = True,
         fill_with_nans: bool = False,
         coarsening: int = 1,
+        excluded_days: Sequence[str] = (),
     ) -> None:
         super().__init__()
 
@@ -68,9 +74,12 @@ class HeimdallDataset(Dataset):
         # The land/sea mask is the same for every sample, the mesh being computed only when used (never by workers)
         self.mask = get_weights_mask(modality)
 
-        # Days of the store within the date range (the salinity starting on 2010-01-12)
+        # Days of the store within the date range (the salinity starting on 2010-01-12), without the excluded ones
+        excluded = set(excluded_days)
         dates = open_zarr(PATH_DATASETS[modality]).time.dt.strftime("%Y-%m-%d").values
-        self.dates = [date for date in dates if date_start <= date <= date_end]
+        self.dates = [
+            date for date in dates if date_start <= date <= date_end and date not in excluded
+        ]
 
         # Each worker opens the store at its first sample
         self.ds = None
@@ -132,10 +141,10 @@ class HeimdallDataset(Dataset):
         day = self.ds.sel(time=date)
         x = torch.stack([torch.from_numpy(decode(day[var])) for var in self.variables])
 
-        # Clipping each variable to its physical bounds
+        # Values outside the physical bounds of their variable are errors of the data, treated as missing
         for c, var in enumerate(self.variables):
-            if var in VARIABLES_CLIPPING:
-                x[c] = x[c].clamp(*VARIABLES_CLIPPING[var])
+            low, high = VARIABLES_BOUNDS[var]
+            x[c] = torch.where((x[c] >= low) & (x[c] <= high), x[c], torch.nan)
 
         # L3 products have gaps (clouds, swaths), and land points never have a value
         mask = x.isfinite() & (self.mask > 0)
@@ -153,6 +162,25 @@ class HeimdallDataset(Dataset):
             x = x.bfloat16()
 
         return x, mask
+
+
+def get_excluded_days(modality: str) -> list[str]:
+    r"""Load the days left out of a dataset, a dataset without list having no excluded day (e.g. GLORYS).
+
+    Arguments:
+        modality : Name of the modality, a key of DATASET_VARIABLES.
+
+    Returns:
+        dates : Date strings 'YYYY-MM-DD' of the excluded days.
+    """
+
+    path = str(PATH_EXCLUDED_DAYS[modality])
+    fs, _ = fsspec.core.url_to_fs(path, **(OSN_STORAGE if path.startswith("s3://") else {}))
+    if not fs.exists(path):
+        return []
+
+    with fs.open(path) as file:
+        return json.load(file)
 
 
 def get_datasets(
@@ -183,6 +211,7 @@ def get_datasets(
         "standardized": standardized,
         "fill_with_nans": fill_with_nans,
         "coarsening": coarsening,
+        "excluded_days": get_excluded_days(modality),
     }
 
     return (

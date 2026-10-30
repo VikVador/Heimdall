@@ -172,3 +172,25 @@ def test_crop_padding() -> None:
     assert padded.shape == (3, 12)
     np.testing.assert_array_equal(padded[0], [6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1])
     np.testing.assert_array_equal(padded.longitude[:2], [90.0, 135.0])
+
+
+def test_decode_retry() -> None:
+    r"""Determines if a failed read is attempted again, and raised once the attempts are exhausted."""
+
+    class FlakyArray:
+        r"""Creates a variable whose first reads fail, like a corrupted transfer from OSN."""
+
+        def __init__(self, failures: int) -> None:
+            self.failures, self.attrs = failures, {}
+
+        @property
+        def values(self) -> np.ndarray:
+            r"""Return the values, after the failures."""
+            self.failures -= 1
+            if self.failures >= 0:
+                raise RuntimeError("Zstd decompression error: Data corruption detected")
+            return np.array([1.0, 2.0], dtype=np.float32)
+
+    np.testing.assert_array_equal(decode(FlakyArray(failures=2)), [1.0, 2.0])
+    with pytest.raises(RuntimeError):
+        decode(FlakyArray(failures=3))

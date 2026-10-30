@@ -139,18 +139,27 @@ def open_zarr(path: str | Path) -> xr.Dataset:
     return xr.open_zarr(path, storage_options=storage_options, mask_and_scale=False, chunks=None)
 
 
-def decode(da: xr.DataArray) -> np.ndarray:
+def decode(da: xr.DataArray, attempts: int = 3) -> np.ndarray:
     r"""Load a variable opened with open_zarr in float32, unpacking int16 values and setting missing ones to NaN.
 
     Arguments:
-        da : Variable, its attributes holding its scale factor, offset and fill value when it is packed.
+        da       : Variable, its attributes holding its scale factor, offset and fill value when it is packed.
+        attempts : Number of attempts to read the variable before raising the error.
 
     Returns:
         values : Physical values in float32, NaN where missing.
     """
 
+    # A read from OSN sometimes fails (corrupted transfer), the same chunk being read correctly again
+    for attempt in range(attempts):
+        try:
+            stored = da.values
+            break
+        except RuntimeError:
+            if attempt == attempts - 1:
+                raise
+
     # Decoding in float32, since xarray would use float64 and double the memory for no precision
-    stored = da.values
     values = stored.astype(np.float32)
 
     if "scale_factor" in da.attrs or "add_offset" in da.attrs:
