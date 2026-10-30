@@ -16,7 +16,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from heimdall.config import PATH_MODELS
 from heimdall.data.dataloader import get_dataloaders
-from heimdall.data.weights import get_weights_change, get_weights_date, get_weights_stats
+from heimdall.data.weights import get_weights_change, get_weights_stats
 from heimdall.distributed import reduce_mean, setup_distributed
 from heimdall.model.encoders import Encoder
 from heimdall.schedulers import warmup_cosine_decay
@@ -54,39 +54,32 @@ def _build_model(
 
 
 def forward_loss(
-    model      : torch.nn.Module,
-    batch      : tuple,
-    modality   : str,
-    coarsening : int,
-    scale      : Tensor,
-    device     : torch.device,
+    model  : torch.nn.Module,
+    batch  : tuple,
+    scale  : Tensor,
+    device : torch.device,
 ) -> Tensor:
-    r"""Encode the fields of a batch, with their date, and compute the GME loss between the fields and their latents.
+    r"""Encode the fields of a batch and compute the GME loss between the fields and their latents.
 
     Arguments:
-        model      : Encoder, possibly wrapped by DDP.
-        batch      : Single day of the modality, with its date, from HeimdallDataset.
-        modality   : Name of the modality, a key of DATASET_VARIABLES.
-        coarsening : Number of points averaged along the latitude and along the longitude.
-        scale      : Ratio of the std of each variable to the std of its change from one day to the next.
-        device     : Target device.
+        model  : Encoder, possibly wrapped by DDP.
+        batch  : Single day of the modality from HeimdallDataset.
+        scale  : Ratio of the std of each variable to the std of its change from one day to the next.
+        device : Target device.
 
     Returns:
         loss : GME loss of the encoder.
     """
 
-    x, _, dates = batch
-    x           = x[:, 0].to(device)
+    x, _, _ = batch
+    x       = x[:, 0].to(device)
 
-    # The encoder is conditioned on the date (transposed by the collate), the masks being left out of the inputs
-    date = torch.cat([get_weights_date(d, modality, coarsening, dim=2, device=device) for d in dates[0]]).to(x.dtype)
-
+    # The fields stay in float32 for the distances of the loss, autocast running the network in bfloat16
     with torch.amp.autocast(device_type=device.type, dtype=torch.bfloat16):
-        z = model(torch.cat([x, date], dim=1))
+        z = model(x)
 
-    # The loss only compares the geometry of the fields (distances in float32), the conditioning being an input,
-    # measured in typical changes from one day to the next so that every variable weighs in the distances
-    return loss_geometry_embedding(x.float() * scale, z.float())
+    # The distances are measured in typical changes from one day to the next, so that every variable weighs in
+    return loss_geometry_embedding(x * scale, z.float())
 
 
 def training(
@@ -231,7 +224,7 @@ def training(
     for step, batch in enumerate(dataloader_training):
 
         # Forward pass and loss
-        loss = forward_loss(model, batch, modality, coarsening, scale, device)
+        loss = forward_loss(model, batch, scale, device)
 
         # Gradient accumulation
         loss              = loss / steps_gradient_accumulation
@@ -287,7 +280,7 @@ def training(
             loss_validation = 0.0
             with torch.no_grad():
                 for _ in range(batches_validation):
-                    loss_validation += forward_loss(model, next(dataloader_validation), modality, coarsening, scale, device).item() / batches_validation
+                    loss_validation += forward_loss(model, next(dataloader_validation), scale, device).item() / batches_validation
             model.train()
 
             if is_distributed:

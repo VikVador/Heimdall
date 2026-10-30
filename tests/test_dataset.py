@@ -21,7 +21,7 @@ def test_heimdall_dataset_typical(modality: str) -> None:
     assert x.shape == (2, len(DATASET_VARIABLES[modality]), *DATASET_SHAPES[modality])
     assert mask.shape == x.shape
     assert (x[mask == 0] == 0).all()
-    assert x.dtype == torch.bfloat16 and mask.dtype == torch.bool
+    assert x.dtype == torch.float32 and mask.dtype == torch.bool
     assert x.isfinite().all() and 0 < mask.float().mean() < 1
 
 

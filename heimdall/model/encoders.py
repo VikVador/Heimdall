@@ -32,7 +32,7 @@ def get_domain(modality: str) -> dict[str, list[int] | int]:
 
 
 class Encoder(nn.Module):
-    r"""Creates the deterministic encoder of a modality, its fields and date stacked with the mesh of its grid.
+    r"""Creates the deterministic encoder of a modality, its fields stacked with the mesh of its grid.
 
     Arguments:
         modality     : Name of the modality, a key of DATASET_VARIABLES.
@@ -63,12 +63,14 @@ class Encoder(nn.Module):
         self.coarsening = coarsening
         self.domain = get_domain(modality)
 
-        # The sin/cos mesh is rebuilt at loading (not saved), in bfloat16 like the fields
-        static = get_weights_mesh(modality, coarsening).bfloat16()
+        # The sin/cos mesh is rebuilt at loading (not saved)
+        static = get_weights_mesh(modality, coarsening)
         self.register_buffer("static", static, persistent=False)
 
-        # The inputs are the fields and the date, the network finding by itself the points without value (zeros)
-        in_channels = len(DATASET_VARIABLES[modality]) + 2
+        # The inputs are the fields only, the network finding by itself the points without value (zeros), and
+        # no date: two identical states on two dates must have the same latent for the GME (the date conditions
+        # the processor instead)
+        in_channels = len(DATASET_VARIABLES[modality])
 
         # The encoder is deterministic, without modulation of the normalization layers, nor pointwise mixing of
         # the inputs, the first convolution already projecting them on its channels
@@ -87,10 +89,10 @@ class Encoder(nn.Module):
         self.tokens = math.prod(self.shape)
 
     def forward(self, x: Tensor) -> Tensor:
-        r"""Encode fields and their date into latent grids.
+        r"""Encode fields into latent grids.
 
         Arguments:
-            x : Fields and their date (B, C + 2, [Z,] Y, X).
+            x : Fields (B, C, [Z,] Y, X).
 
         Returns:
             z : Latent grids (B, C_z, [Z',] Y', X').

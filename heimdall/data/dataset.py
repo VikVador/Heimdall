@@ -126,8 +126,7 @@ class HeimdallDataset(Dataset):
             date : Date string 'YYYY-MM-DD'.
 
         Returns:
-            x    : Fields (C, Z, Y, X) or (C, Y, X), 0 or NaN where there is no value, in bfloat16 when standardized
-                   (CHL in log10).
+            x    : Fields (C, Z, Y, X) or (C, Y, X), 0 or NaN where there is no value (CHL in log10).
             mask : Points where each variable has a value, sea and observed that day, boolean of the shape of x.
         """
 
@@ -158,10 +157,6 @@ class HeimdallDataset(Dataset):
             x = (x - self.mean) / self.std
 
         x = torch.where(mask, x, torch.nan if self.fill_with_nans else 0.0)
-
-        # Standardized fields are returned in bfloat16, the precision of the encoders, halving their memory
-        if self.standardized:
-            x = x.bfloat16()
 
         return x, mask
 
