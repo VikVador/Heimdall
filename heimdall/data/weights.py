@@ -15,14 +15,14 @@ import xarray as xr
 from datetime import date as Date
 from torch import Tensor
 
-from heimdall.config import PATH_MASKS, PATH_STATS
+from heimdall.config import PATH_ARTEFACTS, PATH_MASKS, PATH_STATS
 from heimdall.data import (
     DATASET_PADDING,
     DATASET_REGION,
     DATASET_SHAPES,
     DATASET_VARIABLES,
 )
-from heimdall.data.tools import coarsened_shape, crop, load_json, open_zarr
+from heimdall.data.tools import coarsened_shape, crop, load_json, load_npy, open_zarr
 
 
 def _prepare(
@@ -124,7 +124,7 @@ def get_weights_mask(
     dim: int = 1,
     device: torch.device | str | None = None,
 ) -> Tensor:
-    r"""Load the land/sea mask of a modality, the sea of an observation product being restricted to the ocean.
+    r"""Load the land/sea mask of a modality, without lakes nor artefact columns.
 
     Arguments:
         modality : Name of the modality, a key of DATASET_VARIABLES.
@@ -141,6 +141,11 @@ def get_weights_mask(
     # The satellites also observe lakes (e.g. Titicaca), which are not part of the ocean of GLORYS
     if modality != "glorys":
         sea &= _ocean(mask)
+
+    # Columns whose values are out of their physical bounds on many days are artefacts (straits, estuaries)
+    artefacts = load_npy(PATH_ARTEFACTS[modality]) if modality in PATH_ARTEFACTS else None
+    if artefacts is not None:
+        sea &= ~artefacts
 
     mask = torch.as_tensor(sea, dtype=torch.float32)[None]
 

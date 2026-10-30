@@ -7,12 +7,14 @@ import numpy as np
 from datetime import date as Date
 from datetime import timedelta
 from multiprocessing import get_context
-from pathlib import Path
 
-from heimdall.config import PATH_PROJECT, PATH_STATS
+from heimdall.config import PATH_PROJECT
 from heimdall.data import DATASET_DATES_TRAINING, DATASET_VARIABLES
 from heimdall.data.dataset import HeimdallDataset, get_excluded_days
 from heimdall.data.tools import moments
+
+# Written on Torch, then copied with rclone to the folder of the dataset on OSN (see its README)
+PATH_OUTPUT = PATH_PROJECT / "datasets"
 
 # Partial sums of each year, combined by --reduce
 PATH_PARTS = PATH_PROJECT / "datasets" / "statistics-parts"
@@ -105,8 +107,9 @@ def reduce(modality: str) -> None:
         }
         for c, var in enumerate(DATASET_VARIABLES[modality])
     }
-    Path(PATH_STATS[modality]).write_text(json.dumps(statistics, indent=1))
-    print(f"{modality}: {int(n.sum())} values, written to {PATH_STATS[modality]}")
+    path = PATH_OUTPUT / f"statistics-{modality}.json"
+    path.write_text(json.dumps(statistics, indent=1))
+    print(f"{modality}: {int(n.sum())} values, written to {path}")
 
 
 if __name__ == "__main__":

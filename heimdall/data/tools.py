@@ -8,6 +8,7 @@ __all__ = [
     "crop",
     "decode",
     "load_json",
+    "load_npy",
     "moments",
     "open_zarr",
 ]
@@ -147,6 +148,25 @@ def load_json(path: str | Path) -> Any:
 
     with fs.open(path) as file:
         return json.load(file)
+
+
+def load_npy(path: str | Path) -> np.ndarray | None:
+    r"""Load a numpy file, on Torch or on OSN.
+
+    Arguments:
+        path : Local path of the file, or its URL on OSN ('s3://...').
+
+    Returns:
+        array : Content of the file, or None if the file does not exist.
+    """
+
+    path = str(path)
+    fs, _ = fsspec.core.url_to_fs(path, **(OSN_STORAGE if path.startswith("s3://") else {}))
+    if not fs.exists(path):
+        return None
+
+    with fs.open(path) as file:
+        return np.load(file)
 
 
 def moments(x: Tensor) -> Tensor:
