@@ -1,5 +1,6 @@
 r"""Tests for heimdall.data.dataset."""
 
+import numpy as np
 import pytest
 import torch
 
@@ -20,7 +21,7 @@ def test_heimdall_dataset_typical(modality: str) -> None:
     assert x.shape == (2, len(DATASET_VARIABLES[modality]), *DATASET_SHAPES[modality])
     assert mask.shape == x.shape
     assert (x[mask == 0] == 0).all()
-    assert x.dtype == torch.bfloat16 and mask.dtype == torch.bool
+    assert x.dtype == torch.float32 and mask.dtype == torch.bool
     assert x.isfinite().all() and 0 < mask.float().mean() < 1
 
 
@@ -112,3 +113,15 @@ def test_heimdall_dataset_excluded_days() -> None:
     )
 
     assert dataset.dates == ["2012-08-01", "2012-08-03"]
+
+
+@pytest.mark.integration
+def test_heimdall_dataset_log10() -> None:
+    r"""Determines if the chlorophyll is given in log10, within the log10 of its physical bounds."""
+
+    dataset = HeimdallDataset("2012-08-01", "2012-08-01", modality="chl", standardized=False)
+    x, mask, _ = dataset[0]
+    low, high = VARIABLES_BOUNDS["CHL"]
+
+    assert (x[mask] >= np.log10(low)).all() and (x[mask] <= np.log10(high)).all()
+    assert -1.5 < x[mask].mean() < 0  # Most of the ocean has 0.03 to 1 mg/m³

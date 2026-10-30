@@ -18,7 +18,7 @@ def test_encoder_typical(tmp_path: Path) -> None:
     r"""Determines if an encoder gives its latent grid, and is saved then loaded with its domain."""
 
     model = Encoder("wind_asc", lat_channels=8, **CONFIG)
-    x = torch.randn(2, 2 + 2, *DATASET_SHAPES["wind_asc"])
+    x = torch.randn(2, 2, *DATASET_SHAPES["wind_asc"])
 
     assert model(x).shape == (2, 8, *model.shape)
     assert model.shape == [n // 4 for n in DATASET_SHAPES["wind_asc"]]
@@ -34,25 +34,14 @@ def test_encoder_typical(tmp_path: Path) -> None:
 
 @pytest.mark.integration
 def test_encoder_coarsening() -> None:
-    r"""Determines if an encoder of a coarsened modality takes the fields and the date at the coarsened grid."""
+    r"""Determines if an encoder of a coarsened modality takes the fields at the coarsened grid."""
 
     model = Encoder("wind_asc", lat_channels=8, coarsening=2, **CONFIG)
     lat, lon = DATASET_SHAPES["wind_asc"]
-    x = torch.randn(2, 2 + 2, lat // 2, lon // 2)
+    x = torch.randn(2, 2, lat // 2, lon // 2)
 
     assert model.static.shape == (4, lat // 2, lon // 2)
     assert model(x).shape == (2, 8, lat // 8, lon // 8)
-
-
-@pytest.mark.integration
-def test_encoder_mixing() -> None:
-    r"""Determines if the inputs are first mixed into as many channels as there are variables."""
-
-    model = Encoder("glorys", lat_channels=8, coarsening=4, **CONFIG)
-    mix = model.encoder.mix
-
-    assert (mix.in_channels, mix.out_channels) == (4 + 2 + 6, 4)
-    assert mix.kernel_size == (1, 1, 1)
 
 
 @pytest.mark.integration

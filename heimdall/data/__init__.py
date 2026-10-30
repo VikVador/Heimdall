@@ -2,7 +2,7 @@ r"""Information about our datasets, the GLORYS states and the surface observatio
 
 __all__ = [
     "VARIABLES_BOUNDS",
-    "VARIABLES_STANDARDIZATION",
+    "VARIABLES_LOG10",
     "DATASET_DATES_TRAINING",
     "DATASET_DATES_VALIDATION",
     "DATASET_DATES_TEST",
@@ -30,24 +30,14 @@ VARIABLES_BOUNDS = {
     "CHL"                     : (0.01,   100.0),
 }
 
-VARIABLES_STANDARDIZATION = {
-    "thetao"                  : "daily",
-    "so"                      : "daily",
-    "uo"                      : "daily",
-    "vo"                      : "daily",
-    "sea_surface_temperature" : "daily",
-    "Sea_Surface_Salinity"    : "daily",
-    "eastward_wind"           : "daily",
-    "northward_wind"          : "daily",
-    "CHL"                     : "daily",
-    "default"                 : "daily",
-}
+# Variables spanning several orders of magnitude, used in log10 (statistics included)
+VARIABLES_LOG10 = ["CHL"]
 
 # ----- Splits
 #
-DATASET_DATES_TRAINING   = ("2000-01-01", "2018-12-31")
-DATASET_DATES_VALIDATION = ("2019-01-01", "2021-12-31")
-DATASET_DATES_TEST       = ("2022-01-01", "2025-12-31")
+DATASET_DATES_TRAINING   = ("2000-01-01", "2021-12-31")
+DATASET_DATES_VALIDATION = ("2022-01-01", "2023-12-31")
+DATASET_DATES_TEST       = ("2024-01-01", "2025-12-31")
 
 # ----- Variables
 #

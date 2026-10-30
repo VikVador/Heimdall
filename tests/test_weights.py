@@ -9,6 +9,7 @@ from heimdall.data.weights import (
     _encode_sin_cos,
     _mask_dataarray,
     _nearest,
+    get_weights_change,
     get_weights_date,
     get_weights_mask,
     get_weights_mesh,
@@ -53,6 +54,7 @@ def test_get_weights_typical(modality: str) -> None:
     shape = DATASET_SHAPES[modality]
     mask, mesh = get_weights_mask(modality), get_weights_mesh(modality)
     mean, std = get_weights_stats(modality)
+    std_change = get_weights_change(modality)
 
     assert mask.shape == (1, *shape)
     assert set(mask.unique().tolist()) <= {0.0, 1.0}
@@ -60,6 +62,7 @@ def test_get_weights_typical(modality: str) -> None:
     assert mesh.abs().max() <= 1.0
     assert mean.shape == std.shape == (len(DATASET_VARIABLES[modality]), *shape[:-2], 1, 1)
     assert (std > 0).all() and mean.isfinite().all()
+    assert std_change.shape == std.shape and (std_change > 0).all()
 
 
 @pytest.mark.integration

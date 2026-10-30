@@ -5,6 +5,7 @@ __all__ = [
     "get_weights_mesh",
     "get_weights_date",
     "get_weights_stats",
+    "get_weights_change",
 ]
 
 import numpy as np
@@ -20,9 +21,8 @@ from heimdall.data import (
     DATASET_REGION,
     DATASET_SHAPES,
     DATASET_VARIABLES,
-    VARIABLES_STANDARDIZATION,
 )
-from heimdall.data.tools import coarsened_shape, crop, open_zarr
+from heimdall.data.tools import coarsened_shape, crop, load_json, open_zarr
 
 
 def _prepare(
@@ -214,13 +214,37 @@ def get_weights_date(
     return _prepare(encoding, dim, device)
 
 
+def _statistics(modality: str, names: list[str]) -> Tensor:
+    r"""Load statistics of the variables of a modality, computed on its training period.
+
+    Arguments:
+        modality : Name of the modality, a key of DATASET_VARIABLES.
+        names    : Names of the statistics, among 'mean', 'std' and 'std_change'.
+
+    Returns:
+        stats : Statistics (S, C, Z, 1, 1) per level for GLORYS and (S, C, 1, 1) otherwise.
+    """
+
+    content = load_json(PATH_STATS[modality])
+    assert content is not None, f"ERROR - No statistics for {modality} at {PATH_STATS[modality]}."
+
+    stats = torch.tensor(
+        [[content[var][name] for var in DATASET_VARIABLES[modality]] for name in names],
+        dtype=torch.float32,
+    )  # (S, C, Z), with Z = 1 for the observations
+    if len(DATASET_SHAPES[modality]) == 2:
+        stats = stats[..., 0]
+
+    return stats[..., None, None]
+
+
 def get_weights_stats(
     modality: str,
     *,
     dim: int = 1,
     device: torch.device | str | None = None,
 ) -> tuple[Tensor, Tensor]:
-    r"""Load the standardization statistics of the variables of a modality, given VARIABLES_STANDARDIZATION.
+    r"""Load the mean and standard deviation of the variables of a modality, on its training period.
 
     Arguments:
         modality : Name of the modality, a key of DATASET_VARIABLES.
@@ -232,20 +256,28 @@ def get_weights_stats(
         std  : Standard deviation of each variable, same shape.
     """
 
-    ds = crop(open_zarr(PATH_STATS[modality]), DATASET_REGION[modality])
-
-    # The passes of a product (asc, des) share their statistics store
-    if "pass" in ds.dims:
-        ds = ds.sel({"pass": modality.split("_")[1]})
-
-    default = VARIABLES_STANDARDIZATION["default"]
-    stats = np.stack([
-        ds[var]
-        .sel({"method": VARIABLES_STANDARDIZATION.get(var, default), "statistic": ["mean", "std"]})
-        .values
-        for var in DATASET_VARIABLES[modality]
-    ])
-    stats = torch.as_tensor(stats, dtype=torch.float32)  # (C, 2) or (C, 2, Z)
-    mean, std = stats[:, 0, ..., None, None], stats[:, 1, ..., None, None]
+    mean, std = _statistics(modality, ["mean", "std"])
 
     return _prepare(mean, dim, device), _prepare(std, dim, device)
+
+
+def get_weights_change(
+    modality: str,
+    *,
+    dim: int = 1,
+    device: torch.device | str | None = None,
+) -> Tensor:
+    r"""Load the standard deviation of the change of each variable from one day to the next, on the training period.
+
+    Arguments:
+        modality : Name of the modality, a key of DATASET_VARIABLES.
+        dim      : Use 2 to add a leading batch dimension, 1 otherwise.
+        device   : Target device ("cpu" or "cuda").
+
+    Returns:
+        std_change : Standard deviation of x(t + 1) - x(t), (C, Z, 1, 1) per level for GLORYS and (C, 1, 1) otherwise.
+    """
+
+    (std_change,) = _statistics(modality, ["std_change"])
+
+    return _prepare(std_change, dim, device)
