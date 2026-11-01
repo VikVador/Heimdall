@@ -34,7 +34,7 @@ installed on each machine and loaded when needed:
 | `animation`  | before a diagram or an animation explaining a mechanism                    |
 | `torch`      | on the NYU Torch cluster: Slurm, storage, Apptainer, Open Storage Network  |
 | `lucia`      | on the Lucia cluster (Cenaero)                                             |
-| `remote`     | the remote session driven from the phone (`claude-phone`, `/phone`)        |
+| `remote`     | the remote session driven from the phone (`claude-remote`, `/phone`)       |
 | `oral-recap` | a dictated message: recap what was understood before working              |
 
 **Which cluster am I on?** Check `hostname` at the start of the session: `torch-*` (or a Torch compute node such as
