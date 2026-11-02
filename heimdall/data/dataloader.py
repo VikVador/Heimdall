@@ -2,10 +2,13 @@ r"""Dataloaders."""
 
 __all__ = [
     "get_dataloaders",
+    "get_fixed_indices",
 ]
 
+import numpy as np
+
 from collections.abc import Iterator, Sequence
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch.utils.data.distributed import DistributedSampler
 from typing import Any
 
@@ -44,6 +47,25 @@ def infinite_dataloader(
         epoch += 1
 
 
+def get_fixed_indices(length: int, samples: int, seed: int = 0) -> list[int]:
+    r"""Choose samples spread evenly through time, in an order mixing the seasons within each batch.
+
+    Arguments:
+        length  : Number of samples of the dataset.
+        samples : Number of samples to keep.
+        seed    : Seed of the order of the samples.
+
+    Returns:
+        indices : Indices of the samples, always the same for a given length, number of samples and seed.
+    """
+
+    # Security
+    assert 0 < samples <= length, f"ERROR - samples must be in [1, {length}], got {samples}."
+
+    indices = np.linspace(0, length - 1, samples).round().astype(int)
+    return np.random.default_rng(seed).permutation(indices).tolist()
+
+
 def get_dataloaders(
     batch_size: int,
     num_workers: int,
@@ -54,6 +76,8 @@ def get_dataloaders(
     rank: int = 0,
     world_size: int = 1,
     is_distributed: bool = False,
+    samples_validation: int | None = None,
+    seed: int = 0,
     **kwargs: Any,
 ) -> tuple[DataLoader | Iterator, DataLoader | Iterator, DataLoader | Iterator]:
     r"""Build and return train, validation, and test dataloaders.
@@ -68,6 +92,8 @@ def get_dataloaders(
         rank            : Global rank of the current process (distributed mode).
         world_size      : Total number of processes (distributed mode).
         is_distributed  : Whether to use DistributedSampler for each dataloader.
+        samples_validation : Number of days of a fixed validation over all the GPUs (every day of the split if None).
+        seed            : Seed of the distributed shuffling, changed when a training resumes to draw other days.
         kwargs          : Forwarded to get_datasets().
 
     Returns:
@@ -87,7 +113,12 @@ def get_dataloaders(
     for inf, bst in zip(infinite, batches, strict=True):
         assert not (inf and bst is None), "ERROR - batches[i] must be set when infinite[i]=True."
 
-    datasets = get_datasets(**kwargs)
+    datasets = list(get_datasets(**kwargs))
+
+    # Comparing two encoders on the same pairs of days halves the noise of the comparison
+    if samples_validation is not None:
+        samples = min(samples_validation, len(datasets[1]))
+        datasets[1] = Subset(datasets[1], get_fixed_indices(len(datasets[1]), samples))
 
     dataloaders = []
     for i, dataset in enumerate(datasets):
@@ -97,6 +128,7 @@ def get_dataloaders(
                 num_replicas=world_size,
                 rank=rank,
                 shuffle=shuffle[i],
+                seed=seed,
                 drop_last=True,
             )
             dataloader_shuffle = False

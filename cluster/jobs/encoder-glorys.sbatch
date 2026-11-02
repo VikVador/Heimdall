@@ -32,9 +32,13 @@ export MASTER_PORT=$((10000 + $(echo -n $SLURM_JOBID | tail -c 4)))
 export WORLD_SIZE=$SLURM_NTASKS
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
+# The job that resumes this training if it stops before its end
+SCRIPT=cluster/jobs/encoder-glorys.sbatch
+source cluster/jobs/resubmit.sh
+
 cd experiments/encoders
 
-srun apptainer exec --nv --overlay $OVERLAY:ro $IMAGE bash -c "
+srun --kill-on-bad-exit=1 apptainer exec --nv --overlay $OVERLAY:ro $IMAGE bash -c "
     source /ext3/env.sh
-    RANK=\$SLURM_PROCID LOCAL_RANK=\$SLURM_LOCALID python -u encoders.py --config configs/encoder/encoder-glorys.yml
+    RANK=\$SLURM_PROCID LOCAL_RANK=\$SLURM_LOCALID python -u encoders.py --config configs/encoder/encoder-glorys.yml --run-id $RUN_ID
 "
