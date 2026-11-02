@@ -344,7 +344,8 @@ def training(
             losses_validation.append(loss_validation)
 
             if rank == 0:
-                if optimizer_step > update_logged:
+                # A job can stop during a validation, after logging the training loss of this same update
+                if optimizer_step >= update_logged:
                     wandb.log({
                         "Validation/Loss"           : loss_validation,
                         "Informations/Steps Update" : optimizer_step,
