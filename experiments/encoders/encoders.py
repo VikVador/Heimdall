@@ -116,7 +116,7 @@ def training(
         steps_logging,
         steps_validation,
         steps_checkpoint,
-        batches_validation,
+        samples_validation,
         stopping_window,
         stopping_threshold,
         batch_size_per_step,
@@ -135,7 +135,7 @@ def training(
         config_training["steps_logging"],
         config_training["steps_validation"],
         config_training["steps_checkpoint"],
-        config_training["batches_validation"],
+        config_training["samples_validation"],
         config_training["stopping_window"],
         config_training["stopping_threshold"],
         config_training["batch_size_per_step"],
@@ -150,7 +150,9 @@ def training(
 
     # Security
     assert batch_size_per_gpu > 1, f"ERROR - The GME loss pairs the samples of a GPU, batch_size_per_gpu must be > 1, got {batch_size_per_gpu}."
-    assert batches_validation >= world_size, f"ERROR - batches_validation counts the batches of all the GPUs, got {batches_validation} for {world_size} GPUs."
+    # Each GPU reads its share of the fixed days, whole batches only: any other number would drop days without a word
+    samples_per_step = batch_size_per_gpu * world_size
+    assert samples_validation % samples_per_step == 0, f"ERROR - samples_validation counts the days of all the GPUs, it must be a multiple of {samples_per_step}, got {samples_validation}."
 
     # Loading the model from a checkpoint, or building it from scratch
     model, config = _build_model(config_model, checkpoint_name, device)
@@ -197,6 +199,9 @@ def training(
     else:
         wandb.init(mode="disabled")
 
+    # The updates redone after a resume are not logged again, so that the curves continue from their last point
+    update_logged = wandb.run.summary.get("Informations/Steps Update", 0) if rank == 0 else 0
+
     # Number of steps to accumulate gradients before updating model parameters
     steps_gradient_accumulation = max(1, math.ceil(batch_size_per_step / (batch_size_per_gpu * world_size)))
     optimizer_step              = 0 if state is None else state["optimizer_step"]
@@ -213,7 +218,7 @@ def training(
         rank            = rank,
         world_size      = world_size,
         is_distributed  = is_distributed,
-        samples_validation = batches_validation * batch_size_per_gpu,
+        samples_validation = samples_validation,
         seed            = optimizer_step,
         modality        = modality,
         window          = 1,
@@ -308,7 +313,7 @@ def training(
             if is_distributed:
                 loss_mean = reduce_mean(loss_mean, device)
 
-            if rank == 0:
+            if rank == 0 and optimizer_step > update_logged:
                 wandb.log({
                     "Training/Loss"              : loss_mean,
                     "Informations/Steps Update"  : optimizer_step,
@@ -339,10 +344,11 @@ def training(
             losses_validation.append(loss_validation)
 
             if rank == 0:
-                wandb.log({
-                    "Validation/Loss"           : loss_validation,
-                    "Informations/Steps Update" : optimizer_step,
-                })
+                if optimizer_step > update_logged:
+                    wandb.log({
+                        "Validation/Loss"           : loss_validation,
+                        "Informations/Steps Update" : optimizer_step,
+                    })
 
                 if saving and loss_validation < loss_validation_best:
                     save(raw_model, config, run_path / "best-validation")

@@ -20,7 +20,7 @@ def load_configuration(path: str | Path) -> list[dict[str, Any]]:
     r"""Load all combinations of parameters from a YAML configuration file.
 
     Arguments:
-        path : Path to the YAML configuration file.
+        path : Path to the YAML configuration file, whose Base key names a common file in the same folder (if any).
 
     Returns:
         configs : List of dicts, one per parameter combination (Cartesian product of list-valued keys).
@@ -36,14 +36,28 @@ def load_configuration(path: str | Path) -> list[dict[str, Any]]:
 
         return d if isinstance(d, list) else [d]
 
-    # Open and read the YAML configuration file
-    with open(path) as file:
-        config = yaml.safe_load(file)
+    def _read(path: Path) -> dict[str, Any]:
+        r"""Read a YAML file, its values replacing those of the file named by its Base key."""
 
-    if not isinstance(config, dict):
-        raise TypeError(
-            f"ERROR - Expected a YAML mapping at the top level, got {type(config).__name__}."
-        )
+        with open(path) as file:
+            config = yaml.safe_load(file)
+
+        if not isinstance(config, dict):
+            raise TypeError(
+                f"ERROR - Expected a YAML mapping at the top level, got {type(config).__name__}."
+            )
+
+        if "Base" not in config:
+            return config
+
+        merged = _read(path.parent / config.pop("Base"))
+        for section, values in config.items():
+            is_section = isinstance(values, dict) and isinstance(merged.get(section), dict)
+            merged[section] = {**merged[section], **values} if is_section else values
+
+        return merged
+
+    config = _read(Path(path))
 
     # Generate combinations
     return _generate_combinations(config)

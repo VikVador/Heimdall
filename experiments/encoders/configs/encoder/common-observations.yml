@@ -1,0 +1,21 @@
+WandB:
+    "entity"  : ["sail-nyu"]
+    "project" : ["heimdall-training-encoders"]
+    "mode"    : ["online"]
+
+State:
+    "saving"           : [true]
+    "resume_optimizer" : [true]
+
+Training:
+    "batch_size_per_step" : [32]
+    "samples_validation"  : [512]
+    "steps_logging"       : [4]
+    "stopping_window"     : [10]
+    "stopping_threshold"  : [0.01]
+    "num_workers"         : [6]
+    "prefetch_factor"     : [1]
+    "warmup_steps"        : [1024]
+    "learning_rate_start" : [0.00005]
+    "learning_rate_peak"  : [0.00010]
+    "learning_rate_end"   : [0.00001]
