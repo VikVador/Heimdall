@@ -7,6 +7,7 @@ __all__ = [
     "get_wandb_hyperparameters",
 ]
 
+import hashlib
 import secrets
 import yaml
 
@@ -19,7 +20,7 @@ def load_configuration(path: str | Path) -> list[dict[str, Any]]:
     r"""Load all combinations of parameters from a YAML configuration file.
 
     Arguments:
-        path : Path to the YAML configuration file.
+        path : Path to the YAML configuration file, whose Base key names a common file in the same folder (if any).
 
     Returns:
         configs : List of dicts, one per parameter combination (Cartesian product of list-valued keys).
@@ -35,31 +36,53 @@ def load_configuration(path: str | Path) -> list[dict[str, Any]]:
 
         return d if isinstance(d, list) else [d]
 
-    # Open and read the YAML configuration file
-    with open(path) as file:
-        config = yaml.safe_load(file)
+    def _read(path: Path) -> dict[str, Any]:
+        r"""Read a YAML file, its values replacing those of the file named by its Base key."""
 
-    if not isinstance(config, dict):
-        raise TypeError(
-            f"ERROR - Expected a YAML mapping at the top level, got {type(config).__name__}."
-        )
+        with open(path) as file:
+            config = yaml.safe_load(file)
+
+        if not isinstance(config, dict):
+            raise TypeError(
+                f"ERROR - Expected a YAML mapping at the top level, got {type(config).__name__}."
+            )
+
+        if "Base" not in config:
+            return config
+
+        merged = _read(path.parent / config.pop("Base"))
+        for section, values in config.items():
+            is_section = isinstance(values, dict) and isinstance(merged.get(section), dict)
+            merged[section] = {**merged[section], **values} if is_section else values
+
+        return merged
+
+    config = _read(Path(path))
 
     # Generate combinations
     return _generate_combinations(config)
 
 
-def generate_run_name(name: str, previous_run_name: str | None = None) -> str:
-    r"""Generate a unique WandB run name, from a descriptive name of the model and a random hash.
+def generate_run_name(
+    name: str,
+    previous_run_name: str | None = None,
+    run_id: str | None = None,
+) -> str:
+    r"""Generate a WandB run name, from a descriptive name of the model and a hash.
 
     Arguments:
         name              : Descriptive name of the model, e.g. 'ENC_glorys_lc256'.
         previous_run_name : WandB name of the resumed run, if any.
+        run_id            : Identifier shared by the jobs of a same training, giving them the same name (random if None).
 
     Returns:
         run_name : Run name of the form {name}__XXX[_YYY], XXX identifying this run and YYY the resumed one.
     """
 
-    run_name = f"{name}__{secrets.token_hex(2).upper()}"
+    run_hash = (
+        secrets.token_hex(2) if run_id is None else hashlib.sha256(run_id.encode()).hexdigest()[:4]
+    )
+    run_name = f"{name}__{run_hash.upper()}"
 
     if previous_run_name is not None:
         run_name = f"{run_name}_{extract_model_hash(previous_run_name)}"

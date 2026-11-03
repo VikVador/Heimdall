@@ -1,25 +1,13 @@
-WandB:
-    "entity"  : ["sail-nyu"]
-    "project" : ["heimdall-training-encoders"]
-    "mode"    : ["online"]
+Base : "common-observations.yml"
 
 State:
-    "saving"          : [true]
     "checkpoint_name" : [null]
 
 Training:
-    "batch_size_per_step" : [32]
-    "batch_size_per_gpu"  : [16]
-    "batches_validation"  : [4]
-    "steps_update"        : [25600]
-    "steps_logging"       : [4]
-    "steps_validation"    : [64]
-    "num_workers"         : [6]
-    "prefetch_factor"     : [1]
-    "warmup_steps"        : [1024]
-    "learning_rate_start" : [0.00005]
-    "learning_rate_peak"  : [0.00010]
-    "learning_rate_end"   : [0.00001]
+    "batch_size_per_gpu" : [16]
+    "steps_update"       : [25600]
+    "steps_validation"   : [512]
+    "steps_checkpoint"   : [512]
 
 Model:
     "modality"      : ["sss_asc"]
