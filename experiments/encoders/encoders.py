@@ -58,25 +58,27 @@ def _build_model(
 
 
 def forward_loss(
-    model  : torch.nn.Module,
-    batch  : tuple,
-    scale  : Tensor,
-    device : torch.device,
+    model         : torch.nn.Module,
+    batch         : tuple,
+    scale         : Tensor,
+    device        : torch.device,
+    memory_format : torch.memory_format,
 ) -> Tensor:
     r"""Encode the fields of a batch and compute the GME loss between the fields and their latents.
 
     Arguments:
-        model  : Encoder, possibly wrapped by DDP.
-        batch  : Single day of the modality from HeimdallDataset.
-        scale  : Ratio of the std of each variable to the std of its change from one day to the next.
-        device : Target device.
+        model         : Encoder, possibly wrapped by DDP.
+        batch         : Single day of the modality from HeimdallDataset.
+        scale         : Ratio of the std of each variable to the std of its change from one day to the next.
+        device        : Target device.
+        memory_format : Layout of the fields in memory, the channels last during the training.
 
     Returns:
         loss : GME loss of the encoder.
     """
 
     x, _, _ = batch
-    x       = x[:, 0].to(device)
+    x       = x[:, 0].to(device, memory_format=memory_format)
 
     # The fields stay in float32 for the distances of the loss, autocast running the network in bfloat16
     with torch.amp.autocast(device_type=device.type, dtype=torch.bfloat16):
@@ -225,6 +227,17 @@ def training(
         coarsening      = coarsening,
     )
 
+    # The convolutions run faster in bfloat16 with the channels last, a layout of the training only: the shapes do
+    # not change, and a saved encoder loads back with the usual layout
+    spatial       = len(model.shape)
+    memory_format = torch.channels_last if spatial == 2 else torch.channels_last_3d
+    for parameter in model.parameters():
+        if parameter.dim() == spatial + 2:
+            parameter.data = parameter.data.contiguous(memory_format=memory_format)
+
+    # The network is compiled at its first batch, its normalizations and activations fused around the convolutions
+    model.compile()
+
     # Masks and meshes are identical on every process, there is no need to broadcast them
     if is_distributed:
         ddp_kwargs = {"device_ids": [local_rank], "output_device": local_rank} if device.type == "cuda" else {}
@@ -269,7 +282,7 @@ def training(
     for step, batch in enumerate(dataloader_training):
 
         # Forward pass and loss
-        loss = forward_loss(model, batch, scale, device)
+        loss = forward_loss(model, batch, scale, device, memory_format)
         samples_seen += batch_size_per_gpu * world_size
 
         # Gradient accumulation
@@ -329,7 +342,7 @@ def training(
             loss_validation = 0.0
             with torch.no_grad():
                 for batch in dataloader_validation:
-                    loss_validation += forward_loss(model, batch, scale, device).item() / len(dataloader_validation)
+                    loss_validation += forward_loss(model, batch, scale, device, memory_format).item() / len(dataloader_validation)
             model.train()
 
             # The training loss of one batch is noisy, the mean since the last validation is what gets compared

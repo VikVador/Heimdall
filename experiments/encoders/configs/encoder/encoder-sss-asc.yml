@@ -12,7 +12,7 @@ Training:
 Model:
     "modality"      : ["sss_asc"]
     "coarsening"    : [1]
-    "checkpointing" : [true]
+    "checkpointing" : [false]
     "dropout"       : [0.00]
     "ffn_factor"    : [1]
     "kernel_size"   : [3]
