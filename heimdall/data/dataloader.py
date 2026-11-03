@@ -5,7 +5,7 @@ __all__ = [
 ]
 
 from collections.abc import Iterator, Sequence
-from shaggy.training import get_fixed_indices, infinite_dataloader
+from shaggy.dataloader import get_fixed_indices, infinite_dataloader
 from torch.utils.data import DataLoader, Subset
 from torch.utils.data.distributed import DistributedSampler
 from typing import Any
