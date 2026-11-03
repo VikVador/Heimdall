@@ -10,21 +10,21 @@ import wandb
 
 from omegaconf import OmegaConf
 from pathlib import Path
+from shaggy.distributed import reduce_mean, setup_distributed
 from shaggy.loss import loss_geometry_embedding
 from shaggy.optimizers.gradients import safe_gradient_step
 from shaggy.optimizers.soap import SOAP
+from shaggy.schedulers import warmup_cosine_decay
 from shaggy.tools import load_config, load_weights, save
+from shaggy.training import has_stagnated, load_state, save_state
 from torch import Tensor
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from heimdall.config import PATH_MODELS
 from heimdall.data.dataloader import get_dataloaders
 from heimdall.data.weights import get_weights_change, get_weights_stats
-from heimdall.distributed import reduce_mean, setup_distributed
 from heimdall.model.encoders import Encoder
-from heimdall.schedulers import warmup_cosine_decay
 from heimdall.tools import generate_run_name, get_wandb_hyperparameters, load_configuration
-from heimdall.training import has_stagnated, load_state, save_state
 
 
 # fmt: off
@@ -209,20 +209,20 @@ def training(
 
     # Each sample is a single day of the modality
     dataloader_training, dataloader_validation, _ = get_dataloaders(
-        batch_size      = batch_size_per_gpu,
-        num_workers     = num_workers,
-        prefetch_factor = prefetch_factor,
-        batches         = batches,
-        shuffle         = [True, False, False],
-        infinite        = [True, False, False],
-        rank            = rank,
-        world_size      = world_size,
-        is_distributed  = is_distributed,
+        batch_size         = batch_size_per_gpu,
+        num_workers        = num_workers,
+        prefetch_factor    = prefetch_factor,
+        batches            = batches,
+        shuffle            = [True, False, False],
+        infinite           = [True, False, False],
+        rank               = rank,
+        world_size         = world_size,
+        is_distributed     = is_distributed,
         samples_validation = samples_validation,
-        seed            = optimizer_step,
-        modality        = modality,
-        window          = 1,
-        coarsening      = coarsening,
+        seed               = optimizer_step,
+        modality           = modality,
+        window             = 1,
+        coarsening         = coarsening,
     )
 
     # Masks and meshes are identical on every process, there is no need to broadcast them
