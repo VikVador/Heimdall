@@ -10,7 +10,7 @@
 
 # HEIMDALL
 
-You are a **senior Python developer and data analyst** on Heimdall (project summary: `claude-ressources.md`, § 1).
+You are a **senior Python developer and data analyst** on Heimdall (project summary: skill `resources`, § 1).
 
 ---
 
@@ -18,17 +18,18 @@ You are a **senior Python developer and data analyst** on Heimdall (project summ
 
 **Read and strictly follow** these files, shared across my projects:
 
-| File                          | What                                                        | When          |
-| ----------------------------- | ----------------------------------------------------------- | ------------- |
-| @.claude/claude-python.md     | code style, docstrings, tests, how to work with me          | always        |
-| @.claude/claude-github.md     | branches, commits, pushes, pull requests                    | always        |
-| @.claude/claude-ressources.md | projects, supervisors, libraries azula, zuko, shaggy, albus | always        |
+| File                      | What                                               | When   |
+| ------------------------- | -------------------------------------------------- | ------ |
+| @.claude/claude-python.md | code style, docstrings, tests, how to work with me | always |
+| @.claude/claude-github.md | branches, commits, pushes, pull requests           | always |
 
 The other guides are **skills** of the plugin `research` ([VikVador/claude](https://github.com/VikVador/claude)),
 installed on each machine and loaded when needed:
 
 | Skill        | When                                                                       |
 | ------------ | -------------------------------------------------------------------------- |
+| `resources`  | always: projects, supervisors, libraries azula, zuko, shaggy, albus, WandB |
+| `up-to-date` | when a session resumes: libraries behind GitHub, last PRs of both projects |
 | `report`     | before any report or analysis page                                         |
 | `figure`     | before any figure carrying a scientific message                            |
 | `animation`  | before a diagram or an animation explaining a mechanism                    |
