@@ -13,6 +13,7 @@ Training:
     "steps_logging"       : [4]
     "stopping_window"     : [10]
     "stopping_threshold"  : [0.01]
+    "scale_distances"     : [true]
     "num_workers"         : [6]
     "prefetch_factor"     : [1]
     "warmup_steps"        : [1024]

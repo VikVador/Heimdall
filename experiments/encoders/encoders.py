@@ -121,6 +121,7 @@ def training(
         samples_validation,
         stopping_window,
         stopping_threshold,
+        scale_distances,
         batch_size_per_step,
         batch_size_per_gpu,
         num_workers,
@@ -140,6 +141,7 @@ def training(
         config_training["samples_validation"],
         config_training["stopping_window"],
         config_training["stopping_threshold"],
+        config_training["scale_distances"],
         config_training["batch_size_per_step"],
         config_training["batch_size_per_gpu"],
         config_training["num_workers"],
@@ -163,6 +165,11 @@ def training(
     # A variable whose std is mostly geographical (e.g. the temperature) changes little in standard deviations
     _, std = get_weights_stats(modality, dim=2, device=device)
     scale  = std / get_weights_change(modality, dim=2, device=device)
+
+    # Without the scaling, every variable weighs 1: for the ocean, the scaling puts most of the distance on the slow
+    # drift of the deep levels between two days far apart
+    if not scale_distances:
+        scale = torch.ones_like(scale)
 
     # The Weights & Biases run is named after the architecture, the jobs of a same training sharing its name
     previous_name = None if checkpoint_name is None else Path(checkpoint_name).parts[0]
