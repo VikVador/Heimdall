@@ -125,3 +125,27 @@ def test_heimdall_dataset_log10() -> None:
 
     assert (x[mask] >= np.log10(low)).all() and (x[mask] <= np.log10(high)).all()
     assert -1.5 < x[mask].mean() < 0  # Most of the ocean has 0.03 to 1 mg/m³
+
+
+@pytest.mark.integration
+def test_heimdall_dataset_glorys_days_on_torch(monkeypatch: pytest.MonkeyPatch) -> None:
+    r"""Determines if a day of GLORYS read from its copy on Torch equals the same day preprocessed from OSN."""
+
+    from heimdall.data import dataset as module
+
+    if (
+        module.PATH_GLORYS_DAYS is None
+        or not (module.PATH_GLORYS_DAYS / "2012-08-01.npy").exists()
+    ):
+        pytest.skip("No copy of the days of GLORYS on this machine.")
+
+    dataset = HeimdallDataset("2012-08-01", "2012-08-01", modality="glorys", coarsening=4)
+    x_copy, mask_copy = dataset.preprocess("2012-08-01")
+
+    monkeypatch.setattr(module, "PATH_GLORYS_DAYS", None)
+    x_osn, mask_osn = dataset.preprocess("2012-08-01")
+
+    # The copy cannot tell an ocean point exactly at its mean (0 once standardized) from land, the value being 0 anyway
+    assert torch.equal(x_copy, x_osn)
+    assert not (mask_copy & ~mask_osn).any()
+    assert (x_osn[mask_osn & ~mask_copy] == 0).all()
