@@ -1,3 +1,5 @@
+<img src="assets/banner.svg" width="100%">
+
 <hr style="color:#808080;">
 <p align="center"><b>H E I M D A L L</b></p>
 <hr style="color:#808080;">
