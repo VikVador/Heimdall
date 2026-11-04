@@ -19,7 +19,7 @@ Model:
     "patch_size"    : [1]
     "periodic"      : [[-1]]
     "lat_channels"  : [128]
-    "hid_channels"  : [[16, 32, 64, 128, 256, 512]]
+    "hid_channels"  : [[8, 16, 32, 64, 128, 256]]
     "hid_blocks"    : [[3, 3, 3, 3, 3, 3]]
     "stride"        : [[
         [2, 2],
