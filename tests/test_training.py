@@ -52,3 +52,4 @@ def test_load_configuration_encoders() -> None:
         }
         assert training["samples_validation"] % training["batch_size_per_gpu"] == 0
         assert training["scale_distances"] == (config["Model"]["modality"] != "glorys")
+        assert config["Model"]["periodic"] == [-1]
