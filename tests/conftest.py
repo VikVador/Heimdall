@@ -1,15 +1,19 @@
-r"""Pytest configuration: integration mark and auto-skip in CI or when the datasets on OSN are unreachable."""
+r"""Pytest configuration: integration mark and auto-skip in CI or when the datasets are unreachable."""
 
 import os
 import pytest
 import s3fs
 
-from heimdall.config import OSN_STORAGE, PATH_DATASETS
+from pathlib import Path
+
+from heimdall.config import DATA_SOURCE, OSN_STORAGE, PATH_DATASETS, PATH_OSN
 
 
-def osn_available() -> bool:
-    r"""Check whether the datasets on OSN can be read (anonymously, the bucket being public)."""
+def datasets_available() -> bool:
+    r"""Check whether the datasets can be read: GLORYS on OSN (anonymously), and their copy when read on Torch."""
 
+    if DATA_SOURCE == "torch" and not Path(PATH_OSN).exists():
+        return False
     try:
         fs = s3fs.S3FileSystem(**OSN_STORAGE)
         return fs.exists(f"{PATH_DATASETS['glorys']}/zarr.json")
@@ -30,13 +34,13 @@ def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    r"""Auto-skip integration tests in CI (GitHub runners lack the memory) or if the datasets on OSN are unreachable."""
+    r"""Auto-skip integration tests in CI (GitHub runners lack the memory) or if the datasets are unreachable."""
 
     if not any(item.get_closest_marker("integration") for item in items):
         return
-    if "CI" not in os.environ and osn_available():
+    if "CI" not in os.environ and datasets_available():
         return
-    skip_integration = pytest.mark.skip(reason="CI or datasets on OSN unreachable")
+    skip_integration = pytest.mark.skip(reason="CI or datasets unreachable")
     for item in items:
         if item.get_closest_marker("integration"):
             item.add_marker(skip_integration)

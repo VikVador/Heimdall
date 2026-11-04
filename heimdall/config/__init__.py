@@ -5,8 +5,11 @@ __all__ = [
     "PATH_PROJECT",
     "PATH_MODELS",
     "PATH_ANALYSIS",
+    "DATA_SOURCE",
     "OSN_STORAGE",
     "PATH_OSN",
+    "PATH_GLORYS_DAYS",
+    "GLORYS_DAYS_COARSENING",
     "PATH_DATASETS",
     "PATH_MASKS",
     "PATH_STATS",
@@ -32,11 +35,21 @@ PATH_ANALYSIS = Path(__file__).parents[2] / "experiments" / "analysis"
 
 # ----- Datasets
 #
+# Where the datasets are read: "osn" (the public bucket, from anywhere) or "torch" (its copy on the scratch of Torch,
+# much faster to read); the copy has the same folders and files as the bucket
+DATA_SOURCE = "torch"
+
 # Anonymous connection to the public bucket
 OSN_STORAGE = {"anon": True, "client_kwargs": {"endpoint_url": "https://nyu1.osn.mghpcc.org"}}
 
-# Creating paths to the datasets on the OSN storage
-PATH_OSN    = "s3://m2lines-pubs/Datasets"
+# Creating paths to the datasets, on the OSN storage or on Torch
+PATH_BUCKET = "s3://m2lines-pubs/Datasets"
+PATH_OSN    = PATH_BUCKET if DATA_SOURCE == "osn" else str(PATH_PROJECT / "datasets" / "osn")
+
+# The store of GLORYS (12 TB) stays on OSN: on Torch, its days already preprocessed with a coarsening of 4 are read
+# instead, the other days and coarsenings coming from OSN
+PATH_GLORYS_DAYS       = None if DATA_SOURCE == "osn" else PATH_PROJECT / "datasets" / "glorys-c4"
+GLORYS_DAYS_COARSENING = 4
 
 GLORYS      = f"{PATH_OSN}/Glorys"
 TEMPERATURE = f"{PATH_OSN}/Satellites/Temperature"
@@ -64,7 +77,7 @@ PATH_EXCLUDED_DAYS  = {modality: f"{folder}/excluded-days-{modality}.json" for m
 PATH_ARTEFACTS = {"glorys": f"{GLORYS}/artefacts-glorys.npy"}
 
 PATH_DATASETS = {
-    "glorys"   : f"{GLORYS}/cmems_glorys_2000-2025_daily_4320x2041x50.zarr",
+    "glorys"   : f"{PATH_BUCKET}/Glorys/cmems_glorys_2000-2025_daily_4320x2041x50.zarr",
     "sst"      : f"{TEMPERATURE}/cmems_temperature_2000-2025_daily_3600x1600.zarr",
     "sss_asc"  : f"{SALINITY}/cmems_salinity-asc_2010-2025_daily_1800x837.zarr",
     "sss_des"  : f"{SALINITY}/cmems_salinity-des_2010-2025_daily_1800x837.zarr",

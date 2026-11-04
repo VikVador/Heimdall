@@ -6,6 +6,7 @@ __all__ = [
     "get_excluded_days",
 ]
 
+import numpy as np
 import torch
 
 from collections.abc import Sequence
@@ -13,7 +14,12 @@ from functools import cached_property
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from heimdall.config import PATH_DATASETS, PATH_EXCLUDED_DAYS
+from heimdall.config import (
+    GLORYS_DAYS_COARSENING,
+    PATH_DATASETS,
+    PATH_EXCLUDED_DAYS,
+    PATH_GLORYS_DAYS,
+)
 from heimdall.data import (
     DATASET_DATES_TEST,
     DATASET_DATES_TRAINING,
@@ -129,6 +135,19 @@ class HeimdallDataset(Dataset):
             x    : Fields (C, Z, Y, X) or (C, Y, X), 0 or NaN where there is no value (CHL in log10).
             mask : Points where each variable has a value, sea and observed that day, boolean of the shape of x.
         """
+
+        # On Torch, a day of GLORYS already preprocessed with this coarsening is read from its copy, where the points
+        # without value are 0, as the rare ocean points exactly at their mean (32 out of 66 million on 2012-08-01)
+        if (
+            self.modality == "glorys"
+            and self.standardized
+            and self.coarsening == GLORYS_DAYS_COARSENING
+        ):
+            path = None if PATH_GLORYS_DAYS is None else PATH_GLORYS_DAYS / f"{date}.npy"
+            if path is not None and path.exists():
+                x = torch.from_numpy(np.load(path))
+                mask = x != 0
+                return torch.where(mask, x, torch.nan if self.fill_with_nans else 0.0), mask
 
         if self.ds is None:
             self.ds = crop(
