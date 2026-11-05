@@ -9,7 +9,7 @@ State:
 
 Training:
     "batch_size_per_step" : [16]
-    "batch_size_per_gpu"  : [2]
+    "batch_size_per_gpu"  : [8]
     "samples_validation"  : [128]
     "steps_update"        : [8192]
     "steps_logging"       : [4]
@@ -18,7 +18,7 @@ Training:
     "stopping_window"     : [10]
     "stopping_threshold"  : [0.01]
     "scale_distances"     : [false]
-    "num_workers"         : [4]
+    "num_workers"         : [6]
     "prefetch_factor"     : [1]
     "warmup_steps"        : [256]
     "learning_rate_start" : [0.00005]

@@ -14,11 +14,11 @@
 #SBATCH --job-name=heimdall-encoder-glorys
 #SBATCH --account=torch_pr_347_courant
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=8
-#SBATCH --gres=gpu:8
-#SBATCH --constraint=h200
+#SBATCH --ntasks-per-node=2
+#SBATCH --gres=gpu:2
+#SBATCH --constraint=rtx6000|h200|b200
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=2000G
+#SBATCH --mem=256G
 #SBATCH --time=48:00:00
 #SBATCH --output=cluster/logs/%x-%j.out
 

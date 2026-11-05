@@ -18,8 +18,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=rtx6000
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
 #SBATCH --time=48:00:00
 #SBATCH --output=cluster/logs/%x-%A_%a.out
 
