@@ -4,6 +4,7 @@ __all__ = [
     "PATH_SCRATCH",
     "PATH_PROJECT",
     "PATH_MODELS",
+    "PATH_LATENTS",
     "PATH_ANALYSIS",
     "DATA_SOURCE",
     "OSN_STORAGE",
@@ -31,6 +32,7 @@ PATH_PROJECT = PATH_SCRATCH / "heimdall"
 # ----- Subfolders
 #
 PATH_MODELS   = PATH_PROJECT / "models"
+PATH_LATENTS  = PATH_PROJECT / "latents"
 PATH_ANALYSIS = Path(__file__).parents[2] / "experiments" / "analysis"
 
 # ----- Datasets

@@ -1,0 +1,58 @@
+# One section per dataset: its trained encoder (a run of PATH_MODELS and one of its checkpoints, the run null until
+# trained), the splits to encode, and the loading of its days
+
+glorys:
+    "run"             : [null]
+    "checkpoint"      : ["best-validation"]
+    "splits"          : [["training", "validation", "test"]]
+    "batch_size"      : [4]
+    "num_workers"     : [4]
+    "prefetch_factor" : [2]
+
+sst:
+    "run"             : [null]
+    "checkpoint"      : ["best-validation"]
+    "splits"          : [["training", "validation", "test"]]
+    "batch_size"      : [8]
+    "num_workers"     : [12]
+    "prefetch_factor" : [2]
+
+sss_asc:
+    "run"             : [null]
+    "checkpoint"      : ["best-validation"]
+    "splits"          : [["training", "validation", "test"]]
+    "batch_size"      : [8]
+    "num_workers"     : [12]
+    "prefetch_factor" : [2]
+
+sss_des:
+    "run"             : [null]
+    "checkpoint"      : ["best-validation"]
+    "splits"          : [["training", "validation", "test"]]
+    "batch_size"      : [8]
+    "num_workers"     : [12]
+    "prefetch_factor" : [2]
+
+wind_asc:
+    "run"             : [null]
+    "checkpoint"      : ["best-validation"]
+    "splits"          : [["training", "validation", "test"]]
+    "batch_size"      : [8]
+    "num_workers"     : [12]
+    "prefetch_factor" : [2]
+
+wind_des:
+    "run"             : [null]
+    "checkpoint"      : ["best-validation"]
+    "splits"          : [["training", "validation", "test"]]
+    "batch_size"      : [8]
+    "num_workers"     : [12]
+    "prefetch_factor" : [2]
+
+chl:
+    "run"             : [null]
+    "checkpoint"      : ["best-validation"]
+    "splits"          : [["training", "validation", "test"]]
+    "batch_size"      : [4]
+    "num_workers"     : [12]
+    "prefetch_factor" : [2]
