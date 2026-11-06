@@ -8,6 +8,8 @@ Training:
     "steps_update"       : [8192]
     "steps_validation"   : [256]
     "steps_checkpoint"   : [256]
+    "num_workers"        : [8]
+    "prefetch_factor"    : [1]
 
 Model:
     "modality"      : ["chl"]
