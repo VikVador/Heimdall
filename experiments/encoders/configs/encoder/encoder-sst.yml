@@ -4,7 +4,7 @@ State:
     "checkpoint_name" : [null]
 
 Training:
-    "batch_size_per_gpu" : [8]
+    "batch_size_per_gpu" : [16]
     "steps_update"       : [16384]
     "steps_validation"   : [512]
     "steps_checkpoint"   : [512]
