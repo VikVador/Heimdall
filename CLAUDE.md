@@ -10,7 +10,7 @@
 
 # HEIMDALL
 
-You are a **senior Python developer and data analyst** on Heimdall (project summary: skill `resources`, § 1).
+You are a **senior Python developer and data analyst** on Heimdall (project summary: skill `research`, § 1).
 
 ---
 
@@ -26,21 +26,24 @@ You are a **senior Python developer and data analyst** on Heimdall (project summ
 The other guides are **skills** of the plugin `research` ([VikVador/claude](https://github.com/VikVador/claude)),
 installed on each machine and loaded when needed:
 
-| Skill        | When                                                                       |
-| ------------ | -------------------------------------------------------------------------- |
-| `resources`  | always: projects, supervisors, libraries azula, zuko, shaggy, albus, WandB |
-| `up-to-date` | when a session resumes: libraries behind GitHub, last PRs of both projects |
-| `report`     | before any report or analysis page                                         |
-| `figure`     | before any figure carrying a scientific message                            |
-| `animation`  | before a diagram or an animation explaining a mechanism                    |
-| `torch`      | on the NYU Torch cluster: Slurm, storage, Apptainer, Open Storage Network  |
-| `lucia`      | on the Lucia cluster (Cenaero)                                             |
-| `remote`     | the remote session driven from the phone (`claude-remote`, `/phone`)       |
-| `oral-recap` | a dictated message: recap what was understood before working              |
+| Skill                 | When                                                                       |
+| --------------------- | -------------------------------------------------------------------------- |
+| `research`            | always: projects, supervisors, libraries azula, zuko, shaggy, albus, WandB |
+| `auto-update`         | when a session resumes: libraries behind GitHub, last PRs of both projects |
+| `auto-message-format` | every answer: short or long format, recap of a dictated message            |
+| `auto-ci`             | when a pull request is opened or updated: watch and fix the CI             |
+| `create-report`       | before any report or analysis page                                         |
+| `create-figure`       | before any figure carrying a scientific message                            |
+| `create-diagram`      | before a diagram or an animation explaining a mechanism                    |
+| `create-slides`       | slides for a meeting or a talk                                             |
+| `create-message`      | a message sharing progress or asking for help                              |
+| `cluster-torch`       | on the NYU Torch cluster: Slurm, storage, Apptainer, Open Storage Network  |
+| `cluster-lucia`       | on the Lucia cluster (Cenaero)                                             |
+| `cluster-remote`      | the remote session kept alive in tmux on a login node (`claude-remote`)    |
 
 **Which cluster am I on?** Check `hostname` at the start of the session: `torch-*` (or a Torch compute node such as
-`gh*`, `gr*`, `gl*`) → the `torch` skill; `frontal*` or a Lucia node → the `lucia` skill. Read it **before** any
-Slurm job, transfer or storage operation.
+`gh*`, `gr*`, `gl*`) → the `cluster-torch` skill; `frontal*` or a Lucia node → the `cluster-lucia` skill. Read it
+**before** any Slurm job, transfer or storage operation.
 
 When two rules disagree, the most specific one wins (e.g. `claude-github.md` over `claude-python.md` for commits).
 
