@@ -5,6 +5,7 @@ __all__ = [
     "PATH_PROJECT",
     "PATH_MODELS",
     "PATH_LATENTS",
+    "PATH_LATENT_DATASETS",
     "PATH_ANALYSIS",
     "DATA_SOURCE",
     "OSN_STORAGE",
@@ -86,4 +87,18 @@ PATH_DATASETS = {
     "wind_asc" : f"{WIND}/cmems_wind-asc_2000-2025_daily_1440x720.zarr",
     "wind_des" : f"{WIND}/cmems_wind-des_2000-2025_daily_1440x720.zarr",
     "chl"      : f"{CHLOROPHYLL}/cmems_chlorophyll_2000-2025_daily_8640x4320.zarr",
+}
+
+# ----- Latents
+#
+# Latents of each dataset, encoded by its trained encoder on the scratch of Torch (temporary: the scratch is purged
+# after 60 days without access)
+PATH_LATENT_DATASETS = {
+    "glorys"   : PATH_LATENTS / "ENC_glorys_lc128_tk25515__D60D"  / "best-validation",
+    "sst"      : PATH_LATENTS / "ENC_sst_lc128_tk5650__F439"      / "best-validation",
+    "sss_asc"  : PATH_LATENTS / "ENC_sss_asc_lc128_tk5876__00CA"  / "best-validation",
+    "sss_des"  : PATH_LATENTS / "ENC_sss_des_lc128_tk5876__0836"  / "best-validation",
+    "wind_asc" : PATH_LATENTS / "ENC_wind_asc_lc128_tk3780__038B" / "best-validation",
+    "wind_des" : PATH_LATENTS / "ENC_wind_des_lc128_tk3780__991F" / "best-validation",
+    "chl"      : PATH_LATENTS / "ENC_chl_lc128_tk9045__940E"      / "best-validation",
 }

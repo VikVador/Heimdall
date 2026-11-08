@@ -2,57 +2,57 @@
 # trained), the splits to encode, and the loading of its days
 
 glorys:
-    "run"             : [null]
+    "run"             : ["ENC_glorys_lc128_tk25515__D60D"]
     "checkpoint"      : ["best-validation"]
-    "splits"          : [["training", "validation", "test"]]
+    "splits"          : [["training", "validation"]]
     "batch_size"      : [4]
     "num_workers"     : [4]
     "prefetch_factor" : [2]
 
 sst:
-    "run"             : [null]
+    "run"             : ["ENC_sst_lc128_tk5650__F439"]
     "checkpoint"      : ["best-validation"]
-    "splits"          : [["training", "validation", "test"]]
+    "splits"          : [["training", "validation"]]
     "batch_size"      : [8]
     "num_workers"     : [12]
     "prefetch_factor" : [2]
 
 sss_asc:
-    "run"             : [null]
+    "run"             : ["ENC_sss_asc_lc128_tk5876__00CA"]
     "checkpoint"      : ["best-validation"]
-    "splits"          : [["training", "validation", "test"]]
+    "splits"          : [["training", "validation"]]
     "batch_size"      : [8]
     "num_workers"     : [12]
     "prefetch_factor" : [2]
 
 sss_des:
-    "run"             : [null]
+    "run"             : ["ENC_sss_des_lc128_tk5876__0836"]
     "checkpoint"      : ["best-validation"]
-    "splits"          : [["training", "validation", "test"]]
+    "splits"          : [["training", "validation"]]
     "batch_size"      : [8]
     "num_workers"     : [12]
     "prefetch_factor" : [2]
 
 wind_asc:
-    "run"             : [null]
+    "run"             : ["ENC_wind_asc_lc128_tk3780__038B"]
     "checkpoint"      : ["best-validation"]
-    "splits"          : [["training", "validation", "test"]]
+    "splits"          : [["training", "validation"]]
     "batch_size"      : [8]
     "num_workers"     : [12]
     "prefetch_factor" : [2]
 
 wind_des:
-    "run"             : [null]
+    "run"             : ["ENC_wind_des_lc128_tk3780__991F"]
     "checkpoint"      : ["best-validation"]
-    "splits"          : [["training", "validation", "test"]]
+    "splits"          : [["training", "validation"]]
     "batch_size"      : [8]
     "num_workers"     : [12]
     "prefetch_factor" : [2]
 
 chl:
-    "run"             : [null]
+    "run"             : ["ENC_chl_lc128_tk9045__940E"]
     "checkpoint"      : ["best-validation"]
-    "splits"          : [["training", "validation", "test"]]
+    "splits"          : [["training", "validation"]]
     "batch_size"      : [4]
-    "num_workers"     : [12]
-    "prefetch_factor" : [2]
+    "num_workers"     : [8]
+    "prefetch_factor" : [1]
