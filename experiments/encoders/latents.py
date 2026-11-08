@@ -205,7 +205,7 @@ def encode_modality(
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     path   = PATH_MODELS / run / checkpoint
-    model  = load_weights(Encoder(**OmegaConf.to_container(load_config(path))), path, device=str(device))
+    model  = load_weights(Encoder(**OmegaConf.to_container(load_config(path))), path, device=str(device)).eval()
 
     # Security
     assert model.modality == modality, f"ERROR - {run} encodes {model.modality}, not {modality}."
