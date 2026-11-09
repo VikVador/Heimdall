@@ -11,6 +11,7 @@ __all__ = [
     "DATASET_PADDING",
     "DATASET_SHAPES",
     "MODALITIES",
+    "OBSERVATIONS",
 ]
 
 # fmt: off
@@ -52,6 +53,9 @@ DATASET_VARIABLES = {
 }
 
 MODALITIES = list(DATASET_VARIABLES)
+
+# Surface observation products, given to the processor with the GLORYS states
+OBSERVATIONS = [modality for modality in MODALITIES if modality != "glorys"]
 
 # ----- Domain
 #
